@@ -1,12 +1,12 @@
 """Tests for cesiumkit.datasources module."""
 
+from cesiumkit.color import RED
 from cesiumkit.datasources import (
+    CustomDataSource,
     CzmlDataSource,
     GeoJsonDataSource,
     KmlDataSource,
-    CustomDataSource,
 )
-from cesiumkit.color import RED
 
 
 class TestCzmlDataSource:

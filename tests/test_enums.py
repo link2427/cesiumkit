@@ -1,12 +1,12 @@
 """Tests for cesiumkit.enums module."""
 
 from cesiumkit.enums import (
-    HeightReference,
-    SceneMode,
-    ShadowMode,
     ArcType,
     ClockRange,
+    HeightReference,
+    SceneMode,
     ScreenSpaceEventType,
+    ShadowMode,
 )
 
 

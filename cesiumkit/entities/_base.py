@@ -6,8 +6,8 @@ from typing import Any
 
 from pydantic import ConfigDict
 
-from cesiumkit.base import CesiumBase
 from cesiumkit._js_serializer import camelize, to_js_value
+from cesiumkit.base import CesiumBase
 from cesiumkit.utils import generate_id
 
 
@@ -53,10 +53,7 @@ class EntityGraphics(CesiumBase):
             elif isinstance(value, (int, float, str)):
                 result[js_key] = value
             elif isinstance(value, (list, tuple)):
-                result[js_key] = [
-                    item.to_czml() if hasattr(item, "to_czml") else item
-                    for item in value
-                ]
+                result[js_key] = [item.to_czml() if hasattr(item, "to_czml") else item for item in value]
         return result
 
 
@@ -126,8 +123,7 @@ class Entity(CesiumBase):
         parts: list[str] = []
 
         # Core fields
-        core_fields = ["id", "name", "description", "show", "position",
-                        "orientation", "availability", "parent"]
+        core_fields = ["id", "name", "description", "show", "position", "orientation", "availability", "parent"]
         for field_name in core_fields:
             value = getattr(self, field_name)
             if value is None:

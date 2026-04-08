@@ -1,13 +1,13 @@
 """Tests for cesiumkit.coordinates module."""
 
 from cesiumkit.coordinates import (
+    BoundingSphere,
     Cartesian2,
     Cartesian3,
     Cartographic,
-    RectangleCoords,
-    NearFarScalar,
     DistanceDisplayCondition,
-    BoundingSphere,
+    NearFarScalar,
+    RectangleCoords,
 )
 
 

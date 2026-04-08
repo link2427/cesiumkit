@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from cesiumkit.base import CesiumBase
 from cesiumkit._js_serializer import to_js_value
+from cesiumkit.base import CesiumBase
 
 
 class GlobeConfig(CesiumBase):
@@ -28,25 +28,15 @@ class GlobeConfig(CesiumBase):
         """Generate JS statements to configure the globe after viewer creation."""
         stmts: list[str] = []
         if self.show is not None:
-            stmts.append(
-                f"{viewer_var}.scene.globe.show = {str(self.show).lower()};"
-            )
+            stmts.append(f"{viewer_var}.scene.globe.show = {str(self.show).lower()};")
         if self.enable_lighting is not None:
-            stmts.append(
-                f"{viewer_var}.scene.globe.enableLighting = {str(self.enable_lighting).lower()};"
-            )
+            stmts.append(f"{viewer_var}.scene.globe.enableLighting = {str(self.enable_lighting).lower()};")
         if self.depth_test_against_terrain is not None:
             stmts.append(
-                f"{viewer_var}.scene.globe.depthTestAgainstTerrain = "
-                f"{str(self.depth_test_against_terrain).lower()};"
+                f"{viewer_var}.scene.globe.depthTestAgainstTerrain = {str(self.depth_test_against_terrain).lower()};"
             )
         if self.base_color is not None:
-            stmts.append(
-                f"{viewer_var}.scene.globe.baseColor = {to_js_value(self.base_color)};"
-            )
+            stmts.append(f"{viewer_var}.scene.globe.baseColor = {to_js_value(self.base_color)};")
         if self.show_ground_atmosphere is not None:
-            stmts.append(
-                f"{viewer_var}.scene.globe.showGroundAtmosphere = "
-                f"{str(self.show_ground_atmosphere).lower()};"
-            )
+            stmts.append(f"{viewer_var}.scene.globe.showGroundAtmosphere = {str(self.show_ground_atmosphere).lower()};")
         return stmts

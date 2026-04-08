@@ -7,7 +7,6 @@ from typing import Any
 
 from cesiumkit.base import CesiumBase
 from cesiumkit.enums import ClockRange, ClockStep
-from cesiumkit._js_serializer import to_js_value
 
 
 class JulianDate(CesiumBase):

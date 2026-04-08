@@ -9,9 +9,7 @@ class TerrainProvider(CesiumBase):
     """Base for all terrain providers."""
 
     def _js_class_name(self) -> str:
-        raise NotImplementedError(
-            f"{self.__class__.__name__} must implement _js_class_name()"
-        )
+        raise NotImplementedError(f"{self.__class__.__name__} must implement _js_class_name()")
 
 
 class EllipsoidTerrainProvider(TerrainProvider):
@@ -52,8 +50,6 @@ class IonTerrainProvider(TerrainProvider):
         if self.request_vertex_normals:
             opts["requestVertexNormals"] = True
         if opts:
-            opts_str = ", ".join(
-                f"{k}: {str(v).lower()}" for k, v in opts.items()
-            )
+            opts_str = ", ".join(f"{k}: {str(v).lower()}" for k, v in opts.items())
             return f"Cesium.createWorldTerrainAsync({{{opts_str}}})"
         return "Cesium.createWorldTerrainAsync()"

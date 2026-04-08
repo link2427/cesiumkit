@@ -1,13 +1,12 @@
 """Tests for cesiumkit.imagery module."""
 
 from cesiumkit.imagery import (
-    IonImageryProvider,
     BingMapsImageryProvider,
+    IonImageryProvider,
     OpenStreetMapImageryProvider,
-    TileMapServiceImageryProvider,
+    SingleTileImageryProvider,
     UrlTemplateImageryProvider,
     WebMapServiceImageryProvider,
-    SingleTileImageryProvider,
 )
 
 

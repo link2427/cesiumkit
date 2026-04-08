@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from cesiumkit.base import CesiumBase
 from cesiumkit._js_serializer import to_js_value
+from cesiumkit.base import CesiumBase
 from cesiumkit.entities._base import EntityGraphics
 
 
@@ -77,9 +77,7 @@ class PolygonGraphics(EntityGraphics):
         # Convert list hierarchy to PolygonHierarchy JS expression
         if "hierarchy" in fields and isinstance(fields["hierarchy"], list):
             pos_js = ", ".join(to_js_value(p) for p in fields["hierarchy"])
-            fields["hierarchy"] = JsCode(
-                f"new Cesium.PolygonHierarchy([{pos_js}])"
-            )
+            fields["hierarchy"] = JsCode(f"new Cesium.PolygonHierarchy([{pos_js}])")
 
         parts: list[str] = []
         for key, value in fields.items():

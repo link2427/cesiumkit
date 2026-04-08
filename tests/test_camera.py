@@ -2,7 +2,7 @@
 
 from cesiumkit.camera import Camera
 from cesiumkit.coordinates import Cartesian3
-from cesiumkit.math import HeadingPitchRoll, HeadingPitchRange
+from cesiumkit.math import HeadingPitchRange
 
 
 class TestCamera:

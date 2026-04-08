@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from cesiumkit._js_serializer import to_js_options, to_js_value
 from cesiumkit.base import CesiumBase
-from cesiumkit._js_serializer import to_js_value, to_js_options
 
 
 class CameraPosition(CesiumBase):
@@ -55,9 +55,7 @@ class Camera:
         self._operations: list[tuple[str, dict[str, Any]]] = []
         self.initial_view: CameraPosition | None = None
 
-    def set_view(
-        self, destination: Any, orientation: Any = None
-    ) -> Camera:
+    def set_view(self, destination: Any, orientation: Any = None) -> Camera:
         """Queue a setView operation."""
         opts: dict[str, Any] = {"destination": destination}
         if orientation is not None:
@@ -112,22 +110,16 @@ class Camera:
             if method == "lookAt":
                 target_js = to_js_value(opts["target"])
                 offset_js = to_js_value(opts["offset"])
-                statements.append(
-                    f"{viewer_var}.camera.lookAt({target_js}, {offset_js});"
-                )
+                statements.append(f"{viewer_var}.camera.lookAt({target_js}, {offset_js});")
             elif method in ("zoomIn", "zoomOut"):
                 amount = opts.get("amount")
                 if amount is not None:
-                    statements.append(
-                        f"{viewer_var}.camera.{method}({amount});"
-                    )
+                    statements.append(f"{viewer_var}.camera.{method}({amount});")
                 else:
                     statements.append(f"{viewer_var}.camera.{method}();")
             else:
                 # setView, flyTo - take options object
                 opts_js = to_js_options(opts, exclude_none=True)
-                statements.append(
-                    f"{viewer_var}.camera.{method}({opts_js});"
-                )
+                statements.append(f"{viewer_var}.camera.{method}({opts_js});")
 
         return statements

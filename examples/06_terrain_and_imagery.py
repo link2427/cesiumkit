@@ -23,27 +23,29 @@ viewer = cesiumkit.Viewer(
 )
 
 # Add a marker at the Grand Canyon
-viewer.add_entity(cesiumkit.Entity(
-    name="Grand Canyon",
-    position=cesiumkit.Cartesian3.from_degrees(-112.1129, 36.1069, 2000),
-    point=cesiumkit.PointGraphics(
-        pixel_size=12,
-        color=cesiumkit.Color.RED,
-        outline_color=cesiumkit.Color.WHITE,
-        outline_width=2,
-        height_reference=cesiumkit.HeightReference.RELATIVE_TO_GROUND,
-    ),
-    label=cesiumkit.LabelGraphics(
-        text="Grand Canyon",
-        font="16px sans-serif",
-        fill_color=cesiumkit.Color.WHITE,
-        outline_color=cesiumkit.Color.BLACK,
-        outline_width=2,
-        style=cesiumkit.LabelStyle.FILL_AND_OUTLINE,
-        pixel_offset=cesiumkit.Cartesian2(x=0, y=-20),
-        height_reference=cesiumkit.HeightReference.RELATIVE_TO_GROUND,
-    ),
-))
+viewer.add_entity(
+    cesiumkit.Entity(
+        name="Grand Canyon",
+        position=cesiumkit.Cartesian3.from_degrees(-112.1129, 36.1069, 2000),
+        point=cesiumkit.PointGraphics(
+            pixel_size=12,
+            color=cesiumkit.Color.RED,
+            outline_color=cesiumkit.Color.WHITE,
+            outline_width=2,
+            height_reference=cesiumkit.HeightReference.RELATIVE_TO_GROUND,
+        ),
+        label=cesiumkit.LabelGraphics(
+            text="Grand Canyon",
+            font="16px sans-serif",
+            fill_color=cesiumkit.Color.WHITE,
+            outline_color=cesiumkit.Color.BLACK,
+            outline_width=2,
+            style=cesiumkit.LabelStyle.FILL_AND_OUTLINE,
+            pixel_offset=cesiumkit.Cartesian2(x=0, y=-20),
+            height_reference=cesiumkit.HeightReference.RELATIVE_TO_GROUND,
+        ),
+    )
+)
 
 # Fly to Grand Canyon with a nice angle
 viewer.fly_to(

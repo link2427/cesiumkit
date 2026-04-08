@@ -1,14 +1,14 @@
 """Tests for cesiumkit.properties module."""
 
-from cesiumkit.properties import (
-    ConstantProperty,
-    SampledProperty,
-    SampledPositionProperty,
-    TimeIntervalCollectionProperty,
-    CallbackProperty,
-    ReferenceProperty,
-)
 from cesiumkit.coordinates import Cartesian3
+from cesiumkit.properties import (
+    CallbackProperty,
+    ConstantProperty,
+    ReferenceProperty,
+    SampledPositionProperty,
+    SampledProperty,
+    TimeIntervalCollectionProperty,
+)
 from cesiumkit.utils import JsCode
 
 

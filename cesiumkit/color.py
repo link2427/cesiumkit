@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import random
-from typing import Any
 
 from pydantic import PrivateAttr
 
@@ -48,9 +47,7 @@ class Color(CesiumBase):
         return c
 
     @classmethod
-    def from_bytes(
-        cls, red: int, green: int, blue: int, alpha: int = 255
-    ) -> Color:
+    def from_bytes(cls, red: int, green: int, blue: int, alpha: int = 255) -> Color:
         """Create a Color from byte values (0-255)."""
         return cls(
             red=red / 255.0,

@@ -6,8 +6,8 @@ from typing import Any
 
 from pydantic import Field, PrivateAttr
 
-from cesiumkit.base import CesiumBase
 from cesiumkit._js_serializer import to_js_value
+from cesiumkit.base import CesiumBase
 from cesiumkit.utils import JsCode
 
 
@@ -63,8 +63,8 @@ class SampledProperty(PropertyBase):
             self.add_sample(t, v)
 
     def to_js(self) -> str:
-        lines = [f"(function() {{"]
-        lines.append(f'    var prop = new Cesium.SampledProperty({self.value_type});')
+        lines = ["(function() {"]
+        lines.append(f"    var prop = new Cesium.SampledProperty({self.value_type});")
 
         if self.interpolation_algorithm == "LAGRANGE":
             lines.append(
@@ -214,7 +214,4 @@ class ReferenceProperty(PropertyBase):
 
     def to_js(self) -> str:
         props = ", ".join(f'"{p}"' for p in self.target_property_names)
-        return (
-            f'new Cesium.ReferenceProperty({self.target_collection}, '
-            f'"{self.target_id}", [{props}])'
-        )
+        return f'new Cesium.ReferenceProperty({self.target_collection}, "{self.target_id}", [{props}])'

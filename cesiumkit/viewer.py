@@ -8,7 +8,7 @@ import webbrowser
 from typing import Any
 
 from cesiumkit._html import HtmlDocument
-from cesiumkit._js_serializer import camelize, to_js_value, to_js_options
+from cesiumkit._js_serializer import camelize, to_js_value
 from cesiumkit.czml import CzmlDocument
 from cesiumkit.enums import SceneMode, ScreenSpaceEventType
 from cesiumkit.events import EventHandler
@@ -65,6 +65,7 @@ class Viewer:
         # Ion
         if ion_token is None:
             from cesiumkit.ion import Ion
+
             ion_token = Ion.get_default_token()
         self.ion_token = ion_token
 
@@ -111,11 +112,13 @@ class Viewer:
         # Camera
         if camera is None:
             from cesiumkit.camera import Camera
+
             camera = Camera()
         self.camera = camera
 
         # Collections
         from cesiumkit.entities._base import EntityCollection
+
         self.entities = EntityCollection()
         self._data_sources: list[Any] = []
         self._tilesets: list[Any] = []
@@ -138,6 +141,7 @@ class Viewer:
     def load_czml(self, url: str | None = None, data: list[dict] | None = None) -> Any:
         """Load CZML data."""
         from cesiumkit.datasources import CzmlDataSource
+
         ds = CzmlDataSource(url=url, data=data)
         self._data_sources.append(ds)
         return ds
@@ -145,6 +149,7 @@ class Viewer:
     def load_geojson(self, url: str | None = None, data: dict | None = None, **kwargs: Any) -> Any:
         """Load GeoJSON data."""
         from cesiumkit.datasources import GeoJsonDataSource
+
         ds = GeoJsonDataSource(url=url, data=data, **kwargs)
         self._data_sources.append(ds)
         return ds
@@ -152,6 +157,7 @@ class Viewer:
     def load_kml(self, url: str = "", **kwargs: Any) -> Any:
         """Load KML/KMZ data."""
         from cesiumkit.datasources import KmlDataSource
+
         ds = KmlDataSource(url=url, **kwargs)
         self._data_sources.append(ds)
         return ds
@@ -161,6 +167,7 @@ class Viewer:
     def add_tileset(self, url: str | None = None, ion_asset_id: int | None = None, **kwargs: Any) -> Any:
         """Add a 3D Tiles tileset."""
         from cesiumkit.ion import Cesium3DTileset
+
         ts = Cesium3DTileset(url=url, ion_asset_id=ion_asset_id, **kwargs)
         self._tilesets.append(ts)
         return ts
@@ -171,9 +178,7 @@ class Viewer:
         """Register a screen space event handler."""
         if isinstance(handler, str):
             handler = JsCode(handler)
-        self._event_handlers.append(
-            EventHandler(event_type=event_type, handler=handler)
-        )
+        self._event_handlers.append(EventHandler(event_type=event_type, handler=handler))
 
     def add_script(self, js_code: str) -> None:
         """Add custom JavaScript code to be executed after viewer setup."""
@@ -293,7 +298,6 @@ class Viewer:
             open_browser: Whether to automatically open the browser.
         """
         import os
-        import threading
         from http.server import HTTPServer, SimpleHTTPRequestHandler
 
         tmpdir = tempfile.mkdtemp(prefix="cesiumkit_")

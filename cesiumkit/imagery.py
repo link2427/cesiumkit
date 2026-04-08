@@ -11,9 +11,7 @@ class ImageryProvider(CesiumBase):
     """Base for all imagery providers."""
 
     def _js_class_name(self) -> str:
-        raise NotImplementedError(
-            f"{self.__class__.__name__} must implement _js_class_name()"
-        )
+        raise NotImplementedError(f"{self.__class__.__name__} must implement _js_class_name()")
 
 
 class IonImageryProvider(ImageryProvider):

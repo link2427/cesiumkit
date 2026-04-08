@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from cesiumkit.base import CesiumBase
 from cesiumkit._js_serializer import camelize, to_js_value
+from cesiumkit.base import CesiumBase
 
 
 class MaterialBase(CesiumBase):

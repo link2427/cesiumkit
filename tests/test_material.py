@@ -1,17 +1,16 @@
 """Tests for cesiumkit.material module."""
 
+from cesiumkit.color import BLUE, RED, WHITE
 from cesiumkit.material import (
-    SolidColorMaterial,
-    ImageMaterial,
     GridMaterial,
-    StripeMaterial,
-    CheckerboardMaterial,
-    PolylineGlowMaterial,
+    ImageMaterial,
     PolylineArrowMaterial,
     PolylineDashMaterial,
+    PolylineGlowMaterial,
     PolylineOutlineMaterial,
+    SolidColorMaterial,
+    StripeMaterial,
 )
-from cesiumkit.color import RED, BLUE, WHITE
 
 
 class TestSolidColorMaterial:

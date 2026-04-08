@@ -18,28 +18,30 @@ cities = [
 ]
 
 for name, lon, lat in cities:
-    viewer.add_entity(cesiumkit.Entity(
-        name=name,
-        description=f"<h2>{name}</h2><p>Click detected!</p>",
-        position=cesiumkit.Cartesian3.from_degrees(lon, lat, 0),
-        point=cesiumkit.PointGraphics(
-            pixel_size=14,
-            color=cesiumkit.Color.DODGERBLUE,
-            outline_color=cesiumkit.Color.WHITE,
-            outline_width=2,
-            height_reference=cesiumkit.HeightReference.CLAMP_TO_GROUND,
-        ),
-        label=cesiumkit.LabelGraphics(
-            text=name,
-            font="14px sans-serif",
-            fill_color=cesiumkit.Color.WHITE,
-            outline_color=cesiumkit.Color.BLACK,
-            outline_width=2,
-            style=cesiumkit.LabelStyle.FILL_AND_OUTLINE,
-            pixel_offset=cesiumkit.Cartesian2(x=0, y=-20),
-            height_reference=cesiumkit.HeightReference.CLAMP_TO_GROUND,
-        ),
-    ))
+    viewer.add_entity(
+        cesiumkit.Entity(
+            name=name,
+            description=f"<h2>{name}</h2><p>Click detected!</p>",
+            position=cesiumkit.Cartesian3.from_degrees(lon, lat, 0),
+            point=cesiumkit.PointGraphics(
+                pixel_size=14,
+                color=cesiumkit.Color.DODGERBLUE,
+                outline_color=cesiumkit.Color.WHITE,
+                outline_width=2,
+                height_reference=cesiumkit.HeightReference.CLAMP_TO_GROUND,
+            ),
+            label=cesiumkit.LabelGraphics(
+                text=name,
+                font="14px sans-serif",
+                fill_color=cesiumkit.Color.WHITE,
+                outline_color=cesiumkit.Color.BLACK,
+                outline_width=2,
+                style=cesiumkit.LabelStyle.FILL_AND_OUTLINE,
+                pixel_offset=cesiumkit.Cartesian2(x=0, y=-20),
+                height_reference=cesiumkit.HeightReference.CLAMP_TO_GROUND,
+            ),
+        )
+    )
 
 # Add a click handler that logs picked entities
 viewer.on(

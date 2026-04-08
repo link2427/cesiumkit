@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from cesiumkit.entities._base import EntityGraphics
 
 

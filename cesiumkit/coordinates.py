@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from cesiumkit.base import CesiumBase
-from cesiumkit._js_serializer import to_js_value
 
 
 class Cartesian2(CesiumBase):
@@ -41,23 +38,27 @@ class Cartesian3(CesiumBase):
         return {"cartesian": [self.x, self.y, self.z]}
 
     @classmethod
-    def from_degrees(
-        cls, longitude: float, latitude: float, height: float = 0.0
-    ) -> Cartesian3FromDegrees:
+    def from_degrees(cls, longitude: float, latitude: float, height: float = 0.0) -> Cartesian3FromDegrees:
         """Create a Cartesian3 from longitude/latitude in degrees."""
         return Cartesian3FromDegrees(
-            longitude=longitude, latitude=latitude, height=height,
-            x=0.0, y=0.0, z=0.0,
+            longitude=longitude,
+            latitude=latitude,
+            height=height,
+            x=0.0,
+            y=0.0,
+            z=0.0,
         )
 
     @classmethod
-    def from_radians(
-        cls, longitude: float, latitude: float, height: float = 0.0
-    ) -> Cartesian3FromRadians:
+    def from_radians(cls, longitude: float, latitude: float, height: float = 0.0) -> Cartesian3FromRadians:
         """Create a Cartesian3 from longitude/latitude in radians."""
         return Cartesian3FromRadians(
-            longitude=longitude, latitude=latitude, height=height,
-            x=0.0, y=0.0, z=0.0,
+            longitude=longitude,
+            latitude=latitude,
+            height=height,
+            x=0.0,
+            y=0.0,
+            z=0.0,
         )
 
     @classmethod
@@ -161,13 +162,9 @@ class Cartographic(CesiumBase):
         return f"new Cesium.Cartographic({self.longitude}, {self.latitude}, {self.height})"
 
     @classmethod
-    def from_degrees(
-        cls, longitude: float, latitude: float, height: float = 0.0
-    ) -> CartographicFromDegrees:
+    def from_degrees(cls, longitude: float, latitude: float, height: float = 0.0) -> CartographicFromDegrees:
         """Create a Cartographic from degrees."""
-        return CartographicFromDegrees(
-            longitude=longitude, latitude=latitude, height=height
-        )
+        return CartographicFromDegrees(longitude=longitude, latitude=latitude, height=height)
 
     def to_czml(self) -> dict:
         return {"cartographicRadians": [self.longitude, self.latitude, self.height]}
@@ -218,13 +215,9 @@ class RectangleCoords(CesiumBase):
         return f"new Cesium.Rectangle({self.west}, {self.south}, {self.east}, {self.north})"
 
     @classmethod
-    def from_degrees(
-        cls, west: float, south: float, east: float, north: float
-    ) -> RectangleCoordsFromDegrees:
+    def from_degrees(cls, west: float, south: float, east: float, north: float) -> RectangleCoordsFromDegrees:
         """Create a Rectangle from bounds in degrees."""
-        return RectangleCoordsFromDegrees(
-            west=west, south=south, east=east, north=north
-        )
+        return RectangleCoordsFromDegrees(west=west, south=south, east=east, north=north)
 
     def to_czml(self) -> dict:
         return {"wsenRadians": [self.west, self.south, self.east, self.north]}

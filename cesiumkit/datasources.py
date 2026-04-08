@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from cesiumkit._js_serializer import to_js_value
 from cesiumkit.base import CesiumBase
-from cesiumkit._js_serializer import camelize, to_js_value, to_js_options
 
 
 class DataSource(CesiumBase):
@@ -117,7 +117,7 @@ class KmlDataSource(DataSource):
             opts["clampToGround"] = True
 
         if opts:
-            opt_parts = [f'{k}: {"true" if v else "false"}' for k, v in opts.items()]
+            opt_parts = [f"{k}: {'true' if v else 'false'}" for k, v in opts.items()]
             opts_str = ", ".join(opt_parts)
             return f'Cesium.KmlDataSource.load("{self.url}", {{{opts_str}}})'
 

@@ -16,24 +16,26 @@ landmarks = [
 ]
 
 for name, lon, lat, color in landmarks:
-    viewer.add_entity(cesiumkit.Entity(
-        name=name,
-        position=cesiumkit.Cartesian3.from_degrees(lon, lat, 0),
-        point=cesiumkit.PointGraphics(
-            pixel_size=12,
-            color=color,
-            outline_color=cesiumkit.Color.BLACK,
-            outline_width=2,
-            height_reference=cesiumkit.HeightReference.CLAMP_TO_GROUND,
-        ),
-        label=cesiumkit.LabelGraphics(
-            text=name,
-            font="14px sans-serif",
-            fill_color=color,
-            pixel_offset=cesiumkit.Cartesian2(x=0, y=-18),
-            height_reference=cesiumkit.HeightReference.CLAMP_TO_GROUND,
-        ),
-    ))
+    viewer.add_entity(
+        cesiumkit.Entity(
+            name=name,
+            position=cesiumkit.Cartesian3.from_degrees(lon, lat, 0),
+            point=cesiumkit.PointGraphics(
+                pixel_size=12,
+                color=color,
+                outline_color=cesiumkit.Color.BLACK,
+                outline_width=2,
+                height_reference=cesiumkit.HeightReference.CLAMP_TO_GROUND,
+            ),
+            label=cesiumkit.LabelGraphics(
+                text=name,
+                font="14px sans-serif",
+                fill_color=color,
+                pixel_offset=cesiumkit.Cartesian2(x=0, y=-18),
+                height_reference=cesiumkit.HeightReference.CLAMP_TO_GROUND,
+            ),
+        )
+    )
 
 # Set up camera: fly to Statue of Liberty with a nice angle
 viewer.fly_to(

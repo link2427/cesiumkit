@@ -1,7 +1,6 @@
 """Tests for cesiumkit.base module."""
 
-from cesiumkit.base import CesiumBase, CesiumEnum
-from cesiumkit._js_serializer import camelize, to_js_value, to_js_options
+from cesiumkit._js_serializer import camelize, to_js_options, to_js_value
 
 
 class TestCamelize:

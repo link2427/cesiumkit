@@ -1,25 +1,22 @@
 """Tests for cesiumkit entity system."""
 
-import cesiumkit
+from cesiumkit.color import RED
+from cesiumkit.coordinates import Cartesian3, RectangleCoords
 from cesiumkit.entities._base import Entity, EntityCollection
-from cesiumkit.entities.point import PointGraphics
-from cesiumkit.entities.label import LabelGraphics
-from cesiumkit.entities.polygon import PolygonGraphics, PolygonHierarchy
-from cesiumkit.entities.polyline import PolylineGraphics
+from cesiumkit.entities.billboard import BillboardGraphics
 from cesiumkit.entities.box import BoxGraphics
+from cesiumkit.entities.corridor import CorridorGraphics
 from cesiumkit.entities.cylinder import CylinderGraphics
 from cesiumkit.entities.ellipse import EllipseGraphics
 from cesiumkit.entities.ellipsoid import EllipsoidGraphics
+from cesiumkit.entities.label import LabelGraphics
 from cesiumkit.entities.model import ModelGraphics
-from cesiumkit.entities.billboard import BillboardGraphics
-from cesiumkit.entities.corridor import CorridorGraphics
-from cesiumkit.entities.wall import WallGraphics
-from cesiumkit.entities.rectangle import RectangleGraphics
 from cesiumkit.entities.path import PathGraphics
-from cesiumkit.entities.polyline_volume import PolylineVolumeGraphics
-from cesiumkit.entities.tileset import Cesium3DTilesetGraphics
-from cesiumkit.color import RED, WHITE, BLUE
-from cesiumkit.coordinates import Cartesian3, Cartesian2, RectangleCoords
+from cesiumkit.entities.point import PointGraphics
+from cesiumkit.entities.polygon import PolygonGraphics, PolygonHierarchy
+from cesiumkit.entities.polyline import PolylineGraphics
+from cesiumkit.entities.rectangle import RectangleGraphics
+from cesiumkit.entities.wall import WallGraphics
 
 
 class TestPointGraphics:
@@ -36,8 +33,8 @@ class TestPointGraphics:
 
 class TestLabelGraphics:
     def test_to_js(self):
-        l = LabelGraphics(text="Hello", font="16px sans-serif")
-        js = l.to_js()
+        label = LabelGraphics(text="Hello", font="16px sans-serif")
+        js = label.to_js()
         assert "Hello" in js
         assert "font" in js
 

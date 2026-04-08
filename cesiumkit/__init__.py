@@ -1,80 +1,59 @@
 """cesiumkit: Object-oriented Python interface for CesiumJS 3D geospatial visualization."""
 
+from cesiumkit import color as _color_module
 from cesiumkit._version import __version__
 
 # Core
 from cesiumkit.base import CesiumBase, CesiumEnum
-from cesiumkit.utils import JsCode, generate_id
-
-# Coordinates & Math
-from cesiumkit.coordinates import (
-    Cartesian2,
-    Cartesian3,
-    Cartesian3FromDegrees,
-    Cartesian3FromRadians,
-    Cartesian3DegreesArray,
-    Cartesian3DegreesArrayHeights,
-    Cartographic,
-    CartographicFromDegrees,
-    BoundingSphere,
-    RectangleCoords,
-    RectangleCoordsFromDegrees,
-    NearFarScalar,
-    DistanceDisplayCondition,
-)
-from cesiumkit.math import (
-    HeadingPitchRoll,
-    HeadingPitchRollFromDegrees,
-    HeadingPitchRange,
-    Quaternion,
-    Matrix3,
-    Matrix4,
-)
 
 # Color
 from cesiumkit.color import Color
-from cesiumkit import color as _color_module
-# Make named colors accessible as Color.RED, etc.
-for _name in dir(_color_module):
-    _obj = getattr(_color_module, _name)
-    if isinstance(_obj, Color) and _name.isupper():
-        setattr(Color, _name, _obj)
-del _name, _obj
 
-# Enums
-from cesiumkit.enums import (
-    HeightReference,
-    HorizontalOrigin,
-    VerticalOrigin,
-    LabelStyle,
-    ClassificationType,
-    SceneMode,
-    ShadowMode,
-    ColorBlendMode,
-    ArcType,
-    CornerType,
-    ClockRange,
-    ClockStep,
-    ScreenSpaceEventType,
-    StripeOrientation,
+# Coordinates & Math
+from cesiumkit.coordinates import (
+    BoundingSphere,
+    Cartesian2,
+    Cartesian3,
+    Cartesian3DegreesArray,
+    Cartesian3DegreesArrayHeights,
+    Cartesian3FromDegrees,
+    Cartesian3FromRadians,
+    Cartographic,
+    CartographicFromDegrees,
+    DistanceDisplayCondition,
+    NearFarScalar,
+    RectangleCoords,
+    RectangleCoordsFromDegrees,
 )
+from cesiumkit.math import (
+    HeadingPitchRange,
+    HeadingPitchRoll,
+    HeadingPitchRollFromDegrees,
+    Matrix3,
+    Matrix4,
+    Quaternion,
+)
+from cesiumkit.utils import JsCode, generate_id
 
-# Materials
-from cesiumkit.material import (
-    MaterialBase,
-    SolidColorMaterial,
-    ImageMaterial,
-    GridMaterial,
-    StripeMaterial,
-    CheckerboardMaterial,
-    PolylineGlowMaterial,
-    PolylineArrowMaterial,
-    PolylineDashMaterial,
-    PolylineOutlineMaterial,
+# Camera
+from cesiumkit.camera import Camera, CameraPosition, FlyToOptions, LookAtOptions
+
+# Time & Properties
+from cesiumkit.clock import ClockConfig, JulianDate
+
+# CZML
+from cesiumkit.czml import CzmlDocument
+
+# Data Sources
+from cesiumkit.datasources import (
+    CustomDataSource,
+    CzmlDataSource,
+    GeoJsonDataSource,
+    KmlDataSource,
 )
 
 # Entities
-from cesiumkit.entities._base import Entity, EntityGraphics, EntityCollection
+from cesiumkit.entities._base import Entity, EntityCollection, EntityGraphics
 from cesiumkit.entities.billboard import BillboardGraphics
 from cesiumkit.entities.box import BoxGraphics
 from cesiumkit.entities.corridor import CorridorGraphics
@@ -89,67 +68,87 @@ from cesiumkit.entities.polygon import PolygonGraphics, PolygonHierarchy
 from cesiumkit.entities.polyline import PolylineGraphics
 from cesiumkit.entities.polyline_volume import PolylineVolumeGraphics
 from cesiumkit.entities.rectangle import RectangleGraphics
-from cesiumkit.entities.wall import WallGraphics
 from cesiumkit.entities.tileset import Cesium3DTilesetGraphics
-
-# Time & Properties
-from cesiumkit.clock import JulianDate, ClockConfig
-from cesiumkit.properties import (
-    ConstantProperty,
-    SampledProperty,
-    SampledPositionProperty,
-    TimeIntervalCollectionProperty,
-    CallbackProperty,
-    ReferenceProperty,
+from cesiumkit.entities.wall import WallGraphics
+from cesiumkit.enums import (
+    ArcType,
+    ClassificationType,
+    ClockRange,
+    ClockStep,
+    ColorBlendMode,
+    CornerType,
+    HeightReference,
+    HorizontalOrigin,
+    LabelStyle,
+    SceneMode,
+    ScreenSpaceEventType,
+    ShadowMode,
+    StripeOrientation,
+    VerticalOrigin,
 )
 
-# Data Sources
-from cesiumkit.datasources import (
-    CzmlDataSource,
-    GeoJsonDataSource,
-    KmlDataSource,
-    CustomDataSource,
-)
+# Events
+from cesiumkit.events import EventHandler
+from cesiumkit.globe import GlobeConfig
 
 # Imagery Providers
 from cesiumkit.imagery import (
+    BingMapsImageryProvider,
     ImageryProvider,
     IonImageryProvider,
-    BingMapsImageryProvider,
     OpenStreetMapImageryProvider,
+    SingleTileImageryProvider,
     TileMapServiceImageryProvider,
     UrlTemplateImageryProvider,
     WebMapServiceImageryProvider,
     WebMapTileServiceImageryProvider,
-    SingleTileImageryProvider,
 )
 
-# Terrain Providers
-from cesiumkit.terrain import (
-    TerrainProvider,
-    EllipsoidTerrainProvider,
-    CesiumTerrainProvider,
-    IonTerrainProvider,
-)
+# Ion
+from cesiumkit.ion import Cesium3DTileset, Ion, IonResource
 
-# Camera
-from cesiumkit.camera import Camera, CameraPosition, FlyToOptions, LookAtOptions
+# Materials
+from cesiumkit.material import (
+    CheckerboardMaterial,
+    GridMaterial,
+    ImageMaterial,
+    MaterialBase,
+    PolylineArrowMaterial,
+    PolylineDashMaterial,
+    PolylineGlowMaterial,
+    PolylineOutlineMaterial,
+    SolidColorMaterial,
+    StripeMaterial,
+)
+from cesiumkit.properties import (
+    CallbackProperty,
+    ConstantProperty,
+    ReferenceProperty,
+    SampledPositionProperty,
+    SampledProperty,
+    TimeIntervalCollectionProperty,
+)
 
 # Scene & Globe
 from cesiumkit.scene import SceneConfig
-from cesiumkit.globe import GlobeConfig
 
-# Ion
-from cesiumkit.ion import Ion, IonResource, Cesium3DTileset
-
-# Events
-from cesiumkit.events import EventHandler
-
-# CZML
-from cesiumkit.czml import CzmlDocument
+# Terrain Providers
+from cesiumkit.terrain import (
+    CesiumTerrainProvider,
+    EllipsoidTerrainProvider,
+    IonTerrainProvider,
+    TerrainProvider,
+)
 
 # Viewer — the main entry point
 from cesiumkit.viewer import Viewer
+
+# Make named colors accessible as Color.RED, etc.
+for _name in dir(_color_module):
+    _obj = getattr(_color_module, _name)
+    if isinstance(_obj, Color) and _name.isupper():
+        setattr(Color, _name, _obj)
+del _name, _obj
 
 __all__ = [
     "__version__",

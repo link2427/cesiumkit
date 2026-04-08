@@ -1,8 +1,8 @@
 """Tests for cesiumkit.terrain module."""
 
 from cesiumkit.terrain import (
-    EllipsoidTerrainProvider,
     CesiumTerrainProvider,
+    EllipsoidTerrainProvider,
     IonTerrainProvider,
 )
 

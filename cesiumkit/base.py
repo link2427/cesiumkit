@@ -26,9 +26,7 @@ class CesiumBase(BaseModel):
 
     def _js_class_name(self) -> str:
         """Return the Cesium JS constructor name, e.g. 'Cesium.Color'."""
-        raise NotImplementedError(
-            f"{self.__class__.__name__} must implement _js_class_name()"
-        )
+        raise NotImplementedError(f"{self.__class__.__name__} must implement _js_class_name()")
 
     def _js_fields(self) -> dict[str, Any]:
         """Return the fields to include in JS serialization.
@@ -62,9 +60,7 @@ class CesiumBase(BaseModel):
 
     def to_czml(self) -> dict:
         """Serialize to a CZML-compatible dict. Override in subclasses."""
-        raise NotImplementedError(
-            f"{self.__class__.__name__} does not support CZML export"
-        )
+        raise NotImplementedError(f"{self.__class__.__name__} does not support CZML export")
 
 
 class CesiumEnum(str, Enum):

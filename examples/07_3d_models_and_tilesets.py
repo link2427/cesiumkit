@@ -9,23 +9,25 @@ viewer = cesiumkit.Viewer(
 )
 
 # Load a glTF model (Cesium's sample milk truck)
-viewer.add_entity(cesiumkit.Entity(
-    name="Milk Truck",
-    position=cesiumkit.Cartesian3.from_degrees(-75.59777, 40.03883, 0),
-    model=cesiumkit.ModelGraphics(
-        uri="https://raw.githubusercontent.com/CesiumGS/cesium/main/Apps/SampleData/models/CesiumMilkTruck/CesiumMilkTruck.glb",
-        minimum_pixel_size=64,
-        maximum_scale=20000,
-        height_reference=cesiumkit.HeightReference.CLAMP_TO_GROUND,
-    ),
-    label=cesiumkit.LabelGraphics(
-        text="Milk Truck",
-        font="14px sans-serif",
-        fill_color=cesiumkit.Color.WHITE,
-        pixel_offset=cesiumkit.Cartesian2(x=0, y=-30),
-        height_reference=cesiumkit.HeightReference.CLAMP_TO_GROUND,
-    ),
-))
+viewer.add_entity(
+    cesiumkit.Entity(
+        name="Milk Truck",
+        position=cesiumkit.Cartesian3.from_degrees(-75.59777, 40.03883, 0),
+        model=cesiumkit.ModelGraphics(
+            uri="https://raw.githubusercontent.com/CesiumGS/cesium/main/Apps/SampleData/models/CesiumMilkTruck/CesiumMilkTruck.glb",
+            minimum_pixel_size=64,
+            maximum_scale=20000,
+            height_reference=cesiumkit.HeightReference.CLAMP_TO_GROUND,
+        ),
+        label=cesiumkit.LabelGraphics(
+            text="Milk Truck",
+            font="14px sans-serif",
+            fill_color=cesiumkit.Color.WHITE,
+            pixel_offset=cesiumkit.Cartesian2(x=0, y=-30),
+            height_reference=cesiumkit.HeightReference.CLAMP_TO_GROUND,
+        ),
+    )
+)
 
 # Load a 3D Tileset from Cesium Ion (e.g., New York City buildings)
 # Uncomment if you have an Ion token:

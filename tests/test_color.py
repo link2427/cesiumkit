@@ -1,7 +1,7 @@
 """Tests for cesiumkit.color module."""
 
 import cesiumkit
-from cesiumkit.color import Color, RED, BLUE, WHITE, BLACK, TRANSPARENT
+from cesiumkit.color import BLUE, RED, TRANSPARENT, WHITE, Color
 
 
 class TestColor:

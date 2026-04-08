@@ -14,48 +14,54 @@ class TestFullHtmlOutput:
         )
 
         # Point entity
-        viewer.add_entity(cesiumkit.Entity(
-            name="Point",
-            position=cesiumkit.Cartesian3.from_degrees(-75.59777, 40.03883, 100),
-            point=cesiumkit.PointGraphics(
-                pixel_size=10,
-                color=cesiumkit.Color.RED,
-                outline_color=cesiumkit.Color.WHITE,
-                outline_width=2,
-            ),
-        ))
+        viewer.add_entity(
+            cesiumkit.Entity(
+                name="Point",
+                position=cesiumkit.Cartesian3.from_degrees(-75.59777, 40.03883, 100),
+                point=cesiumkit.PointGraphics(
+                    pixel_size=10,
+                    color=cesiumkit.Color.RED,
+                    outline_color=cesiumkit.Color.WHITE,
+                    outline_width=2,
+                ),
+            )
+        )
 
         # Polygon entity
-        viewer.add_entity(cesiumkit.Entity(
-            name="Polygon",
-            polygon=cesiumkit.PolygonGraphics(
-                hierarchy=[
-                    cesiumkit.Cartesian3.from_degrees(-115, 37),
-                    cesiumkit.Cartesian3.from_degrees(-115, 32),
-                    cesiumkit.Cartesian3.from_degrees(-107, 33),
-                ],
-                material=cesiumkit.Color.RED.with_alpha(0.5),
-                extruded_height=100000,
-                outline=True,
-                outline_color=cesiumkit.Color.BLACK,
-            ),
-        ))
+        viewer.add_entity(
+            cesiumkit.Entity(
+                name="Polygon",
+                polygon=cesiumkit.PolygonGraphics(
+                    hierarchy=[
+                        cesiumkit.Cartesian3.from_degrees(-115, 37),
+                        cesiumkit.Cartesian3.from_degrees(-115, 32),
+                        cesiumkit.Cartesian3.from_degrees(-107, 33),
+                    ],
+                    material=cesiumkit.Color.RED.with_alpha(0.5),
+                    extruded_height=100000,
+                    outline=True,
+                    outline_color=cesiumkit.Color.BLACK,
+                ),
+            )
+        )
 
         # Polyline entity
-        viewer.add_entity(cesiumkit.Entity(
-            name="Line",
-            polyline=cesiumkit.PolylineGraphics(
-                positions=[
-                    cesiumkit.Cartesian3.from_degrees(-75, 35),
-                    cesiumkit.Cartesian3.from_degrees(-125, 35),
-                ],
-                width=5,
-                material=cesiumkit.PolylineGlowMaterial(
-                    color=cesiumkit.Color.CYAN,
-                    glow_power=0.2,
+        viewer.add_entity(
+            cesiumkit.Entity(
+                name="Line",
+                polyline=cesiumkit.PolylineGraphics(
+                    positions=[
+                        cesiumkit.Cartesian3.from_degrees(-75, 35),
+                        cesiumkit.Cartesian3.from_degrees(-125, 35),
+                    ],
+                    width=5,
+                    material=cesiumkit.PolylineGlowMaterial(
+                        color=cesiumkit.Color.CYAN,
+                        glow_power=0.2,
+                    ),
                 ),
-            ),
-        ))
+            )
+        )
 
         # Camera
         viewer.fly_to(
@@ -118,16 +124,18 @@ class TestFullHtmlOutput:
         pos.add_sample("2024-01-01T06:00:00Z", cesiumkit.Cartesian3.from_degrees(-125, 35, 100000))
 
         viewer = cesiumkit.Viewer()
-        viewer.add_entity(cesiumkit.Entity(
-            name="Satellite",
-            position=pos,
-            point=cesiumkit.PointGraphics(pixel_size=8, color=cesiumkit.Color.WHITE),
-            path=cesiumkit.PathGraphics(
-                width=2,
-                trail_time=3600,
-                material=cesiumkit.PolylineDashMaterial(color=cesiumkit.Color.CYAN),
-            ),
-        ))
+        viewer.add_entity(
+            cesiumkit.Entity(
+                name="Satellite",
+                position=pos,
+                point=cesiumkit.PointGraphics(pixel_size=8, color=cesiumkit.Color.WHITE),
+                path=cesiumkit.PathGraphics(
+                    width=2,
+                    trail_time=3600,
+                    material=cesiumkit.PolylineDashMaterial(color=cesiumkit.Color.CYAN),
+                ),
+            )
+        )
 
         html = viewer.to_html()
         assert "SampledPositionProperty" in html

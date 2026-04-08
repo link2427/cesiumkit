@@ -25,11 +25,13 @@ class TestViewer:
 
     def test_add_entity(self):
         v = cesiumkit.Viewer()
-        v.add_entity(cesiumkit.Entity(
-            name="Test Point",
-            position=cesiumkit.Cartesian3.from_degrees(-75, 40),
-            point=cesiumkit.PointGraphics(pixel_size=10, color=cesiumkit.Color.RED),
-        ))
+        v.add_entity(
+            cesiumkit.Entity(
+                name="Test Point",
+                position=cesiumkit.Cartesian3.from_degrees(-75, 40),
+                point=cesiumkit.PointGraphics(pixel_size=10, color=cesiumkit.Color.RED),
+            )
+        )
         html = v.to_html()
         assert "viewer.entities.add" in html
         assert "Test Point" in html
@@ -117,11 +119,13 @@ class TestViewer:
 class TestViewerCzmlExport:
     def test_basic_czml_export(self):
         v = cesiumkit.Viewer()
-        v.add_entity(cesiumkit.Entity(
-            id="test-1",
-            name="Test",
-            position=cesiumkit.Cartesian3.from_degrees(-75, 40, 100),
-        ))
+        v.add_entity(
+            cesiumkit.Entity(
+                id="test-1",
+                name="Test",
+                position=cesiumkit.Cartesian3.from_degrees(-75, 40, 100),
+            )
+        )
         czml = v.to_czml()
         assert len(czml) == 2  # preamble + 1 entity
         assert czml[0]["id"] == "document"

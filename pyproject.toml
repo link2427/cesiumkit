@@ -1,0 +1,59 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cesiumkit"
+version = "0.1.0"
+description = "Object-oriented Python interface for CesiumJS 3D geospatial visualization"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    { name = "Jacob Neel" },
+]
+keywords = [
+    "cesium",
+    "cesiumjs",
+    "geospatial",
+    "3d",
+    "visualization",
+    "globe",
+    "maps",
+    "gis",
+    "czml",
+    "gltf",
+    "tiles",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: GIS",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+dependencies = [
+    "pydantic>=2.0",
+    "jinja2>=3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+]
+
+[project.urls]
+Homepage = "https://github.com/jacobs-github/cesiumkit"
+Documentation = "https://github.com/jacobs-github/cesiumkit#readme"
+Repository = "https://github.com/jacobs-github/cesiumkit"
+Issues = "https://github.com/jacobs-github/cesiumkit/issues"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

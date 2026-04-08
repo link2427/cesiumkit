@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>{{ title }}</title>
+    <script src="https://cesium.com/downloads/cesiumjs/releases/{{ cesium_version }}/Build/Cesium/Cesium.js"></script>
+    <link href="https://cesium.com/downloads/cesiumjs/releases/{{ cesium_version }}/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <style>
+        html, body, #{{ container_id }} {
+            width: {{ width }};
+            height: {{ height }};
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <div id="{{ container_id }}"></div>
+    <script>
+        {% if ion_token %}
+        Cesium.Ion.defaultAccessToken = '{{ ion_token }}';
+        {% endif %}
+
+        {% if not ion_token %}
+        // No Ion token - use bundled NaturalEarthII imagery so the globe loads without auth
+        const viewerOptions = Object.assign({{ viewer_options }}, {
+            baseLayer: Cesium.ImageryLayer.fromProviderAsync(
+                Cesium.TileMapServiceImageryProvider.fromUrl(
+                    Cesium.buildModuleUrl("Assets/Textures/NaturalEarthII")
+                )
+            ),
+            baseLayerPicker: false,
+            geocoder: false,
+        });
+        {% else %}
+        const viewerOptions = {{ viewer_options }};
+        {% endif %}
+
+        const viewer = new Cesium.Viewer('{{ container_id }}', viewerOptions);
+
+        // Allow scripts in the InfoBox iframe to suppress sandbox warnings
+        if (viewer.infoBox) {
+            viewer.infoBox.frame.removeAttribute('sandbox');
+            viewer.infoBox.frame.src = 'about:blank';
+        }
+
+        {% for stmt in scene_statements %}
+        {{ stmt }}
+        {% endfor %}
+
+        {% for stmt in globe_statements %}
+        {{ stmt }}
+        {% endfor %}
+
+        {% for stmt in clock_statements %}
+        {{ stmt }}
+        {% endfor %}
+
+        {% for entity_js in entities %}
+        viewer.entities.add({{ entity_js }});
+        {% endfor %}
+
+        {% for ds_js in data_sources %}
+        viewer.dataSources.add({{ ds_js }});
+        {% endfor %}
+
+        {% for tileset_js in tilesets %}
+        (async () => {
+            try {
+                const tileset = await {{ tileset_js }};
+                viewer.scene.primitives.add(tileset);
+            } catch (error) {
+                console.error('Error loading tileset:', error);
+            }
+        })();
+        {% endfor %}
+
+        {% for camera_op in camera_operations %}
+        {{ camera_op }}
+        {% endfor %}
+
+        {% for event_js in event_handlers %}
+        {{ event_js }};
+        {% endfor %}
+
+        {% for custom_js in custom_scripts %}
+        {{ custom_js }}
+        {% endfor %}
+    </script>
+</body>
+</html>

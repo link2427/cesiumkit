@@ -1,3 +1,4 @@
+.claude/
 __pycache__/
 *.pyc
 *.egg-info/
@@ -6,3 +7,4 @@ build/
 .ruff_cache/
 .pytest_cache/
 *.egg
+site/

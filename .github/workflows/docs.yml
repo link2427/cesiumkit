@@ -15,7 +15,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - run: pip install ".[dev,docs]" coverage-badge
-      - run: pytest --cov=cesiumkit --cov-report=term
-      - run: coverage-badge -o docs/coverage.svg -f
+      - run: pip install ".[dev,docs]" genbadge[coverage]
+      - run: pytest --cov=cesiumkit --cov-report=xml
+      - run: genbadge coverage -i coverage.xml -o docs/coverage.svg
       - run: mkdocs gh-deploy --force

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, field_validator
 
 from cesiumkit._js_serializer import camelize, to_js_value
 from cesiumkit.base import CesiumBase
@@ -114,6 +114,16 @@ class Entity(CesiumBase):
     rectangle: Any = None
     wall: Any = None
     tileset: Any = None
+
+    @field_validator("position", mode="before")
+    @classmethod
+    def _coerce_shapely_position(cls, value: Any) -> Any:
+        """Auto-convert shapely Point to Cartesian3FromDegrees (assumes WGS84)."""
+        from cesiumkit._shapely import is_shapely_geom, shapely_point_to_cartesian3
+
+        if is_shapely_geom(value) and value.geom_type == "Point":
+            return shapely_point_to_cartesian3(value)
+        return value
 
     def _js_class_name(self) -> str:
         return "Cesium.Entity"

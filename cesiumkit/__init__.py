@@ -89,6 +89,9 @@ from cesiumkit.enums import (
 
 # Events
 from cesiumkit.events import EventHandler
+
+# GIS integration (GeoPandas / pandas DataFrame helpers)
+from cesiumkit.gis import dataframe_to_entities, geodataframe_to_entities
 from cesiumkit.globe import GlobeConfig
 
 # Imagery Providers
@@ -272,6 +275,9 @@ __all__ = [
     "EventHandler",
     # CZML
     "CzmlDocument",
+    # GIS helpers
+    "geodataframe_to_entities",
+    "dataframe_to_entities",
     # Viewer
     "Viewer",
 ]

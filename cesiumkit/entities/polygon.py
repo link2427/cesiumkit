@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic import field_validator
+
 from cesiumkit._js_serializer import to_js_value
 from cesiumkit.base import CesiumBase
 from cesiumkit.entities._base import EntityGraphics
@@ -63,6 +65,16 @@ class PolygonGraphics(EntityGraphics):
     arc_type: Any = None
     shadows: Any = None
     classification_type: Any = None
+
+    @field_validator("hierarchy", mode="before")
+    @classmethod
+    def _coerce_shapely_hierarchy(cls, value: Any) -> Any:
+        """Auto-convert shapely Polygon to PolygonHierarchy (assumes WGS84)."""
+        from cesiumkit._shapely import is_shapely_geom, shapely_polygon_to_hierarchy
+
+        if is_shapely_geom(value) and value.geom_type == "Polygon":
+            return shapely_polygon_to_hierarchy(value)
+        return value
 
     def _graphics_key(self) -> str:
         return "polygon"

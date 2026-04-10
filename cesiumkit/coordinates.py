@@ -71,6 +71,21 @@ class Cartesian3(CesiumBase):
         """Create an array from [lon, lat, h, lon, lat, h, ...]."""
         return Cartesian3DegreesArrayHeights(coordinates=coordinates)
 
+    @classmethod
+    def from_shapely(cls, geom: object) -> Cartesian3FromDegrees:
+        """Create a Cartesian3 from a shapely Point (WGS84 lon/lat).
+
+        Requires the geometry to be a Point; raises ValueError otherwise.
+        Uses the Point's z coordinate as height if present, else 0.
+        """
+        from cesiumkit._shapely import is_shapely_geom, shapely_point_to_cartesian3
+
+        if not is_shapely_geom(geom):
+            raise ValueError(f"Expected a shapely geometry, got {type(geom).__name__}")
+        if getattr(geom, "geom_type", None) != "Point":
+            raise ValueError(f"Cartesian3.from_shapely only supports Point geometries, got {geom.geom_type}")
+        return shapely_point_to_cartesian3(geom)
+
 
 class Cartesian3FromDegrees(CesiumBase):
     """A Cartesian3 created from degrees. Serializes to Cesium.Cartesian3.fromDegrees()."""

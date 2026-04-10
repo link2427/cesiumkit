@@ -131,6 +131,36 @@ class Viewer:
         """Add an entity. Can pass an Entity instance or keyword args."""
         return self.entities.add(entity, **kwargs)
 
+    def add_geodataframe(self, gdf: Any, **options: Any) -> list[Any]:
+        """Add all features from a ``geopandas.GeoDataFrame`` to this Viewer.
+
+        This is a one-line shortcut for the most common geospatial workflow:
+        load a GeoDataFrame, drop it on the globe. The GeoDataFrame is
+        auto-reprojected to WGS84 (EPSG:4326) if needed. All keyword arguments
+        are forwarded to ``cesiumkit.gis.geodataframe_to_entities``.
+
+        Returns the list of created entities so they can be further customized.
+        """
+        from cesiumkit.gis import geodataframe_to_entities
+
+        entities = geodataframe_to_entities(gdf, **options)
+        for e in entities:
+            self.entities.add(e)
+        return entities
+
+    def add_dataframe(self, df: Any, lon_col: str, lat_col: str, **options: Any) -> list[Any]:
+        """Add point entities from a plain ``pandas.DataFrame`` with lon/lat columns.
+
+        Shortcut for ``cesiumkit.gis.dataframe_to_entities`` that also attaches
+        each entity to the viewer. Returns the list of created entities.
+        """
+        from cesiumkit.gis import dataframe_to_entities
+
+        entities = dataframe_to_entities(df, lon_col, lat_col, **options)
+        for e in entities:
+            self.entities.add(e)
+        return entities
+
     # --- Data source methods ---
 
     def add_data_source(self, data_source: Any) -> Any:

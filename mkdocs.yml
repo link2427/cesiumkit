@@ -56,6 +56,8 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - GeoPandas & Shapely: getting-started-gis.md
+  - Gallery: gallery.md
   - Examples: examples.md
   - API Reference:
       - Viewer: api/viewer.md
@@ -74,4 +76,5 @@ nav:
       - CZML Export: api/czml.md
       - Clock & Time: api/clock.md
       - Events: api/events.md
+      - GIS Integration: api/gis.md
       - Utilities: api/utils.md

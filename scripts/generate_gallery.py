@@ -55,24 +55,37 @@ def _load_gallery_module(path: Path):
 
 
 def _wait_for_cesium_ready(page) -> None:
-    """Block until Cesium reports tilesLoaded, or until the timeout elapses.
+    """Block until Cesium has actually finished loading its imagery tiles.
 
-    The viewer template attaches the Cesium.Viewer instance to ``window.viewer``
-    so this polling loop can reach it. Once ``globe.tilesLoaded`` flips true we
-    still wait two animation frames so the tiles actually get painted before the
-    screenshot fires.
+    Subtle gotcha: ``globe.tilesLoaded`` returns true whenever the three tile
+    load queues are empty, which is trivially the case at t=0 before Cesium has
+    had any chance to queue anything. A naive ``while (!tilesLoaded)`` poll
+    therefore resolves instantly on the first check and we screenshot an empty
+    viewport. So instead we watch for a *false -> true transition*: once we've
+    seen tilesLoaded be false (meaning real tiles entered the queue), we then
+    wait for it to flip back to true (meaning those tiles finished loading).
+
+    After that we still wait two animation frames so the newly-loaded tiles
+    actually get painted to the canvas before playwright snaps the frame.
     """
     js = f"""
     () => new Promise(resolve => {{
         const start = Date.now();
+        let sawLoading = false;
         const check = () => {{
             const v = window.viewer;
-            if (v && v.scene && v.scene.globe && v.scene.globe.tilesLoaded) {{
-                requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
-                return;
+            const globe = v && v.scene && v.scene.globe;
+            if (globe) {{
+                if (!globe.tilesLoaded) {{
+                    sawLoading = true;
+                }} else if (sawLoading) {{
+                    // False -> true transition: a real load cycle completed.
+                    requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
+                    return;
+                }}
             }}
             if (Date.now() - start > {TILE_LOAD_TIMEOUT_MS}) {{ resolve(false); return; }}
-            setTimeout(check, 200);
+            setTimeout(check, 100);
         }};
         check();
     }})
@@ -82,7 +95,7 @@ def _wait_for_cesium_ready(page) -> None:
     except Exception:
         pass
     # Extra settle time for any final camera easing / render to complete.
-    page.wait_for_timeout(3000)
+    page.wait_for_timeout(2000)
 
 
 def _screenshot_viewer(viewer, out_path: Path) -> None:
@@ -104,6 +117,16 @@ def _screenshot_viewer(viewer, out_path: Path) -> None:
 
 
 def main() -> int:
+    # Force the NaturalEarthII fallback path in the viewer template. Cesium's
+    # default World Imagery (used when an Ion token is set) requires the token
+    # to have access to the specific Ion asset -- if it doesn't, tile requests
+    # silently return empty tiles and the globe renders as a black sphere
+    # against the black skybox, which is exactly the failure mode we've been
+    # chasing. NaturalEarthII is bundled with CesiumJS, needs no auth, and
+    # always renders. To opt back into World Imagery later, remove this line
+    # and ensure CESIUM_ION_TOKEN has the right asset permissions.
+    os.environ.pop("CESIUM_ION_TOKEN", None)
+
     if not GALLERY_DIR.exists():
         print(f"Gallery directory not found: {GALLERY_DIR}", file=sys.stderr)
         return 1

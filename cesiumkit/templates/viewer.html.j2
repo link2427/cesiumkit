@@ -38,6 +38,10 @@
         {% endif %}
 
         const viewer = new Cesium.Viewer('{{ container_id }}', viewerOptions);
+        // Expose the viewer on window so external tools (playwright, devtools,
+        // custom scripts) can reach it. `const` is script-scoped so we need
+        // to attach it explicitly.
+        window.viewer = viewer;
 
         // Allow scripts in the InfoBox iframe to suppress sandbox warnings
         if (viewer.infoBox) {

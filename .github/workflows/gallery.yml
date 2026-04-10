@@ -26,6 +26,12 @@ jobs:
           python -m playwright install chromium --with-deps
 
       - name: Generate gallery screenshots
+        env:
+          # Optional: if the repo has a CESIUM_ION_TOKEN secret, the gallery
+          # scripts will automatically pick it up via cesiumkit.ion and render
+          # the default Cesium World Imagery. Without a token they fall back to
+          # the bundled NaturalEarthII imagery (still looks fine, just flatter).
+          CESIUM_ION_TOKEN: ${{ secrets.CESIUM_ION_TOKEN }}
         run: python scripts/generate_gallery.py
 
       - name: Commit images to gallery-images branch

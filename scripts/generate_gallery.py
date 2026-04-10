@@ -37,8 +37,9 @@ VIEWPORT = {"width": 1600, "height": 900}
 
 # Max time to wait for Cesium to report that all imagery tiles have loaded.
 # If tiles don't finish (e.g. offline / slow tile server) we fall back to a
-# fixed timeout so the CI job doesn't hang forever.
-TILE_LOAD_TIMEOUT_MS = 20_000
+# fixed timeout so the CI job doesn't hang forever. First-time Cesium loads
+# have to fetch the whole CDN bundle, so be generous.
+TILE_LOAD_TIMEOUT_MS = 30_000
 
 
 def _load_gallery_module(path: Path):
@@ -54,16 +55,22 @@ def _load_gallery_module(path: Path):
 
 
 def _wait_for_cesium_ready(page) -> None:
-    """Block until Cesium reports tilesLoaded, or until the timeout elapses."""
+    """Block until Cesium reports tilesLoaded, or until the timeout elapses.
+
+    The viewer template attaches the Cesium.Viewer instance to ``window.viewer``
+    so this polling loop can reach it. Once ``globe.tilesLoaded`` flips true we
+    still wait two animation frames so the tiles actually get painted before the
+    screenshot fires.
+    """
     js = f"""
     () => new Promise(resolve => {{
         const start = Date.now();
         const check = () => {{
-            try {{
-                const viewer = window.viewer || (window.Cesium && Cesium._defaultViewer);
-                const globe = viewer && viewer.scene && viewer.scene.globe;
-                if (globe && globe.tilesLoaded) {{ resolve(true); return; }}
-            }} catch (e) {{}}
+            const v = window.viewer;
+            if (v && v.scene && v.scene.globe && v.scene.globe.tilesLoaded) {{
+                requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
+                return;
+            }}
             if (Date.now() - start > {TILE_LOAD_TIMEOUT_MS}) {{ resolve(false); return; }}
             setTimeout(check, 200);
         }};
@@ -74,8 +81,8 @@ def _wait_for_cesium_ready(page) -> None:
         page.evaluate(js)
     except Exception:
         pass
-    # A small extra wait lets any final camera easing/render settle.
-    page.wait_for_timeout(1500)
+    # Extra settle time for any final camera easing / render to complete.
+    page.wait_for_timeout(3000)
 
 
 def _screenshot_viewer(viewer, out_path: Path) -> None:

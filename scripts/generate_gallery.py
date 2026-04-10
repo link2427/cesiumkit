@@ -98,6 +98,36 @@ def _wait_for_cesium_ready(page) -> None:
     page.wait_for_timeout(2000)
 
 
+_DIAGNOSTIC_JS = """
+() => {
+    const out = { hasViewer: !!window.viewer };
+    const v = window.viewer;
+    if (!v) return out;
+    out.hasScene = !!v.scene;
+    const globe = v.scene && v.scene.globe;
+    if (!globe) return out;
+    out.tilesLoaded = globe.tilesLoaded;
+    out.baseColor = globe.baseColor && globe.baseColor.toCssColorString();
+    const layers = globe.imageryLayers;
+    out.layerCount = layers.length;
+    out.layers = [];
+    for (let i = 0; i < layers.length; i++) {
+        const l = layers.get(i);
+        const p = l.imageryProvider;
+        out.layers.push({
+            show: l.show,
+            alpha: l.alpha,
+            hasProvider: !!p,
+            providerCtor: p && p.constructor && p.constructor.name,
+            providerReady: p && (p.ready !== undefined ? p.ready : "n/a"),
+            tilingScheme: p && p._tilingScheme && p._tilingScheme.constructor.name,
+        });
+    }
+    return out;
+}
+"""
+
+
 def _screenshot_viewer(viewer, out_path: Path) -> None:
     """Render viewer to HTML and screenshot it with playwright."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -110,8 +140,29 @@ def _screenshot_viewer(viewer, out_path: Path) -> None:
             browser = p.chromium.launch()
             context = browser.new_context(viewport=VIEWPORT)
             page = context.new_page()
+
+            # Diagnostic plumbing: surface any browser-side console errors or
+            # unhandled exceptions into the workflow log so we can see what's
+            # actually breaking inside the headless chromium page.
+            page.on(
+                "console",
+                lambda msg: print(f"    [browser.{msg.type}] {msg.text}"),
+            )
+            page.on("pageerror", lambda err: print(f"    [pageerror] {err}"))
+            page.on(
+                "requestfailed",
+                lambda req: print(f"    [requestfailed] {req.url} -- {req.failure}"),
+            )
+
             page.goto(f"file://{html_path}")
             _wait_for_cesium_ready(page)
+
+            try:
+                state = page.evaluate(_DIAGNOSTIC_JS)
+                print(f"    [state] {state}")
+            except Exception as e:
+                print(f"    [state] evaluate failed: {e}")
+
             page.screenshot(path=str(out_path), full_page=False)
             browser.close()
 

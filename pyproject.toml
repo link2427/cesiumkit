@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cesiumkit"
-version = "0.1.0"
+version = "0.2.0"
 description = "Object-oriented Python interface for CesiumJS 3D geospatial visualization"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -52,6 +52,10 @@ dev = [
 docs = [
     "mkdocs-material",
     "mkdocstrings[python]",
+]
+gis = [
+    "geopandas>=0.14",
+    "shapely>=2.0",
 ]
 
 [project.urls]

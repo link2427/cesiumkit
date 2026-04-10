@@ -1,0 +1,53 @@
+name: Gallery
+
+# Gallery screenshot generation is expensive (installs chromium, runs a
+# headless browser) so we don't run it on every push. Triggered manually
+# via the Actions UI, and automatically on release.
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install cesiumkit and playwright
+        run: |
+          pip install ".[gis]" playwright
+          python -m playwright install chromium --with-deps
+
+      - name: Generate gallery screenshots
+        run: python scripts/generate_gallery.py
+
+      - name: Commit images to gallery-images branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Stash the generated images
+          mkdir -p /tmp/gallery-images
+          cp -r docs/images/gallery/* /tmp/gallery-images/
+
+          # Check out or create the gallery-images orphan branch
+          git fetch origin gallery-images || true
+          if git show-ref --verify --quiet refs/remotes/origin/gallery-images; then
+            git checkout gallery-images
+          else
+            git checkout --orphan gallery-images
+            git rm -rf . || true
+          fi
+
+          mkdir -p docs/images/gallery
+          cp /tmp/gallery-images/* docs/images/gallery/
+          git add docs/images/gallery
+          git commit -m "Update gallery images [skip ci]" || echo "No changes"
+          git push origin gallery-images --force

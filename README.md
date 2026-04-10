@@ -10,6 +10,8 @@
 
 cesiumkit gives you a Pythonic, object-oriented API for [CesiumJS](https://cesium.com/cesiumjs/) -- the leading open-source JavaScript library for 3D globes and maps. Define entities, materials, camera views, terrain, imagery, and time-dynamic animations in pure Python, then render them in the browser with a single call.
 
+![Globe hero](https://link2427.github.io/cesiumkit/images/gallery/01_globe_hero.png)
+
 ```python
 import cesiumkit
 
@@ -26,6 +28,13 @@ viewer.show()  # opens in your browser
   <em>That's it -- 6 lines from Python to a 3D globe in the browser.</em>
 </p>
 
+## Gallery
+
+| | | |
+|---|---|---|
+| [![Shapes](https://link2427.github.io/cesiumkit/images/gallery/02_shapes.png)](https://link2427.github.io/cesiumkit/gallery/) | [![Cities](https://link2427.github.io/cesiumkit/images/gallery/03_cities.png)](https://link2427.github.io/cesiumkit/gallery/) | [![Flight path](https://link2427.github.io/cesiumkit/images/gallery/04_flight_path.png)](https://link2427.github.io/cesiumkit/gallery/) |
+| [![GeoPandas](https://link2427.github.io/cesiumkit/images/gallery/05_geopandas.png)](https://link2427.github.io/cesiumkit/gallery/) | [![Extruded polygons](https://link2427.github.io/cesiumkit/images/gallery/06_polygon_3d.png)](https://link2427.github.io/cesiumkit/gallery/) | [More →](https://link2427.github.io/cesiumkit/gallery/) |
+
 ---
 
 ## Install
@@ -36,7 +45,38 @@ pip install cesiumkit
 
 Requires Python 3.10+. No external binary dependencies.
 
+For GeoPandas / Shapely support:
+
+```bash
+pip install cesiumkit[gis]
+```
+
 ## Features
+
+### GeoPandas / Shapely integration
+
+Drop a `GeoDataFrame` onto the globe in one call. Auto-reprojects to WGS84,
+handles mixed geometry types, supports per-feature styling from columns.
+
+```python
+import geopandas as gpd
+import cesiumkit
+
+gdf = gpd.read_file("countries.geojson")
+viewer = cesiumkit.Viewer()
+viewer.add_geodataframe(
+    gdf,
+    name_column="NAME",
+    color_column="color_hex",
+    extruded_height_column="gdp",   # polygons become 3D prisms
+    fill_alpha=0.5,
+)
+viewer.show()
+```
+
+Shapely geometries are also auto-converted anywhere cesiumkit expects
+positions — pass a `shapely.Point` directly to `Entity(position=...)` or a
+`shapely.Polygon` to `PolygonGraphics(hierarchy=...)`.
 
 ### Entities with rich graphics
 

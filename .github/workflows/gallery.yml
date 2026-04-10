@@ -39,9 +39,14 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Stash the generated images
+          # Stash the generated images somewhere git-agnostic. They're
+          # currently untracked on main; if we don't move them out of the
+          # working tree, `git checkout gallery-images` will refuse to
+          # switch branches because the tracked images on that branch
+          # would overwrite these untracked ones.
           mkdir -p /tmp/gallery-images
           cp -r docs/images/gallery/* /tmp/gallery-images/
+          rm -rf docs/images/gallery
 
           # Check out or create the gallery-images orphan branch
           git fetch origin gallery-images || true

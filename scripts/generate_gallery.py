@@ -38,8 +38,9 @@ VIEWPORT = {"width": 1600, "height": 900}
 # Max time to wait for Cesium to report that all imagery tiles have loaded.
 # If tiles don't finish (e.g. offline / slow tile server) we fall back to a
 # fixed timeout so the CI job doesn't hang forever. First-time Cesium loads
-# have to fetch the whole CDN bundle, so be generous.
-TILE_LOAD_TIMEOUT_MS = 30_000
+# have to fetch the whole CDN bundle, plus we now wait for multi-pass tile
+# loading to stabilize, so be generous.
+TILE_LOAD_TIMEOUT_MS = 45_000
 
 
 def _load_gallery_module(path: Path):
@@ -55,33 +56,42 @@ def _load_gallery_module(path: Path):
 
 
 def _wait_for_cesium_ready(page) -> None:
-    """Block until Cesium has actually finished loading its imagery tiles.
+    """Block until Cesium has finished loading its imagery tiles.
 
-    Subtle gotcha: ``globe.tilesLoaded`` returns true whenever the three tile
-    load queues are empty, which is trivially the case at t=0 before Cesium has
-    had any chance to queue anything. A naive ``while (!tilesLoaded)`` poll
-    therefore resolves instantly on the first check and we screenshot an empty
-    viewport. So instead we watch for a *false -> true transition*: once we've
-    seen tilesLoaded be false (meaning real tiles entered the queue), we then
-    wait for it to flip back to true (meaning those tiles finished loading).
+    Two subtleties here:
 
-    After that we still wait two animation frames so the newly-loaded tiles
-    actually get painted to the canvas before playwright snaps the frame.
+    1. ``globe.tilesLoaded`` returns true whenever the three tile load queues
+       are empty, which is trivially the case at t=0 before Cesium has queued
+       anything. So we require an initial false state (real tiles entered the
+       queue) before we start trusting tilesLoaded=true as meaningful.
+
+    2. Cesium loads tiles in multiple passes (low-res first, then progressively
+       higher-res as the view stabilizes). A single false->true transition can
+       fire after only the first pass, while the high-res pass is still pending.
+       So instead of resolving on the first drain, we require
+       ``STABLE_LOADED_MS`` milliseconds of *continuously* tilesLoaded=true --
+       meaning no new tiles have entered the queue for that long.
     """
     js = f"""
     () => new Promise(resolve => {{
         const start = Date.now();
         let sawLoading = false;
+        let loadedSince = 0;
+        const STABLE_LOADED_MS = 2000;
         const check = () => {{
             const v = window.viewer;
             const globe = v && v.scene && v.scene.globe;
             if (globe) {{
                 if (!globe.tilesLoaded) {{
                     sawLoading = true;
+                    loadedSince = 0;
                 }} else if (sawLoading) {{
-                    // False -> true transition: a real load cycle completed.
-                    requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
-                    return;
+                    if (loadedSince === 0) {{
+                        loadedSince = Date.now();
+                    }} else if (Date.now() - loadedSince > STABLE_LOADED_MS) {{
+                        requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
+                        return;
+                    }}
                 }}
             }}
             if (Date.now() - start > {TILE_LOAD_TIMEOUT_MS}) {{ resolve(false); return; }}
@@ -94,8 +104,8 @@ def _wait_for_cesium_ready(page) -> None:
         page.evaluate(js)
     except Exception:
         pass
-    # Extra settle time for any final camera easing / render to complete.
-    page.wait_for_timeout(2000)
+    # Extra settle for any final render / camera easing.
+    page.wait_for_timeout(1000)
 
 
 _DIAGNOSTIC_JS = """

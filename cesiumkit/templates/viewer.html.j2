@@ -22,20 +22,12 @@
         Cesium.Ion.defaultAccessToken = '{{ ion_token }}';
         {% endif %}
 
-        {% if not ion_token %}
-        // No Ion token - use bundled NaturalEarthII imagery so the globe loads without auth
-        const viewerOptions = Object.assign({{ viewer_options }}, {
-            baseLayer: Cesium.ImageryLayer.fromProviderAsync(
-                Cesium.TileMapServiceImageryProvider.fromUrl(
-                    Cesium.buildModuleUrl("Assets/Textures/NaturalEarthII")
-                )
-            ),
-            baseLayerPicker: false,
-            geocoder: false,
-        });
-        {% else %}
+        // Cesium 1.107+ automatically falls back to the bundled NaturalEarthII
+        // imagery when no Ion token is set, so we don't need to specify a
+        // baseLayer explicitly. Doing so via ImageryLayer.fromProviderAsync was
+        // leaving the layer stuck in an unready state in headless chromium,
+        // which is why gallery screenshots rendered as empty skybox.
         const viewerOptions = {{ viewer_options }};
-        {% endif %}
 
         const viewer = new Cesium.Viewer('{{ container_id }}', viewerOptions);
         // Expose the viewer on window so external tools (playwright, devtools,

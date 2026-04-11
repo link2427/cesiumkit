@@ -56,56 +56,17 @@ def _load_gallery_module(path: Path):
 
 
 def _wait_for_cesium_ready(page) -> None:
-    """Block until Cesium has finished loading its imagery tiles.
+    """Fixed 20s wait. See module doc on why we stopped polling tilesLoaded.
 
-    Two subtleties here:
-
-    1. ``globe.tilesLoaded`` returns true whenever the three tile load queues
-       are empty, which is trivially the case at t=0 before Cesium has queued
-       anything. So we require an initial false state (real tiles entered the
-       queue) before we start trusting tilesLoaded=true as meaningful.
-
-    2. Cesium loads tiles in multiple passes (low-res first, then progressively
-       higher-res as the view stabilizes). A single false->true transition can
-       fire after only the first pass, while the high-res pass is still pending.
-       So instead of resolving on the first drain, we require
-       ``STABLE_LOADED_MS`` milliseconds of *continuously* tilesLoaded=true --
-       meaning no new tiles have entered the queue for that long.
+    The previous version polled ``globe.tilesLoaded``, but in headless chromium
+    that flag stays false indefinitely even though the network log shows tiles
+    are being fetched -- some combination of the render loop not draining the
+    tile queues on the expected cadence. Since we can't trust the ready signal
+    here, just wait a fixed amount of time that's empirically enough for the
+    Cesium CDN bundle to download, the viewer to initialise, and the initial
+    tile set for our camera view to render.
     """
-    js = f"""
-    () => new Promise(resolve => {{
-        const start = Date.now();
-        let sawLoading = false;
-        let loadedSince = 0;
-        const STABLE_LOADED_MS = 2000;
-        const check = () => {{
-            const v = window.viewer;
-            const globe = v && v.scene && v.scene.globe;
-            if (globe) {{
-                if (!globe.tilesLoaded) {{
-                    sawLoading = true;
-                    loadedSince = 0;
-                }} else if (sawLoading) {{
-                    if (loadedSince === 0) {{
-                        loadedSince = Date.now();
-                    }} else if (Date.now() - loadedSince > STABLE_LOADED_MS) {{
-                        requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
-                        return;
-                    }}
-                }}
-            }}
-            if (Date.now() - start > {TILE_LOAD_TIMEOUT_MS}) {{ resolve(false); return; }}
-            setTimeout(check, 100);
-        }};
-        check();
-    }})
-    """
-    try:
-        page.evaluate(js)
-    except Exception:
-        pass
-    # Extra settle for any final render / camera easing.
-    page.wait_for_timeout(1000)
+    page.wait_for_timeout(20_000)
 
 
 _DIAGNOSTIC_JS = """

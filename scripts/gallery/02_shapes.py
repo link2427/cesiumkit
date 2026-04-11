@@ -77,8 +77,9 @@ viewer.add_entity(
     )
 )
 
-# Focus camera over the US shapes
+# Focus camera over the US shapes. Straight-down keeps the shapes
+# centered; 2.5M altitude fills the frame with the polygon/polyline region.
 viewer.set_view(
-    cesiumkit.Cartesian3.from_degrees(-92, 37, 4_000_000),
-    orientation=cesiumkit.HeadingPitchRoll(heading=0, pitch=-1.3, roll=0),
+    cesiumkit.Cartesian3.from_degrees(-92, 37.5, 2_500_000),
+    orientation=cesiumkit.HeadingPitchRoll(heading=0, pitch=-1.5707963, roll=0),
 )

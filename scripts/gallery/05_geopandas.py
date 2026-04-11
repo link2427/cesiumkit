@@ -13,30 +13,32 @@ import cesiumkit
 GALLERY_TITLE = "GeoPandas Integration"
 
 # Synthetic "cities + regions" dataset — no network calls, deterministic.
+# Points sit outside the polygon footprints so they're not hidden inside
+# the extruded blocks.
 gdf = gpd.GeoDataFrame(
     {
         "name": ["HQ", "Warehouse", "Office", "Region A", "Region B"],
         "category": ["point", "point", "point", "polygon", "polygon"],
         "color": ["#ff3366", "#33ffaa", "#3388ff", "#ffaa00", "#aa66ff"],
-        "elevation": [0, 0, 0, 200_000, 400_000],
+        "elevation": [0, 0, 0, 2_000, 4_000],
         "geometry": [
-            Point(-74.006, 40.7128),
-            Point(-73.935, 40.730),
-            Point(-73.970, 40.750),
+            Point(-74.05, 40.82),
+            Point(-73.87, 40.82),
+            Point(-73.96, 40.62),
             Polygon(
                 [
-                    (-74.05, 40.68),
-                    (-73.95, 40.68),
-                    (-73.95, 40.78),
-                    (-74.05, 40.78),
+                    (-74.02, 40.70),
+                    (-73.98, 40.70),
+                    (-73.98, 40.76),
+                    (-74.02, 40.76),
                 ]
             ),
             Polygon(
                 [
-                    (-73.93, 40.68),
-                    (-73.85, 40.68),
-                    (-73.85, 40.78),
-                    (-73.93, 40.78),
+                    (-73.92, 40.70),
+                    (-73.88, 40.70),
+                    (-73.88, 40.76),
+                    (-73.92, 40.76),
                 ]
             ),
         ],
@@ -69,8 +71,9 @@ viewer.add_geodataframe(
     extruded_height_column="elevation",
 )
 
-# Focus on Manhattan-ish
+# Oblique view from south of the cluster so the extruded polygons read
+# clearly as 3D blocks and all five features are visible in frame.
 viewer.set_view(
-    cesiumkit.Cartesian3.from_degrees(-73.97, 40.73, 100_000),
-    orientation=cesiumkit.HeadingPitchRoll(heading=0, pitch=-0.9, roll=0),
+    cesiumkit.Cartesian3.from_degrees(-73.95, 40.55, 35_000),
+    orientation=cesiumkit.HeadingPitchRoll(heading=0, pitch=-0.85, roll=0),
 )

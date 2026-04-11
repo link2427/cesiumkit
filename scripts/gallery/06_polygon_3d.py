@@ -59,6 +59,6 @@ for i in range(-3, 4):
         )
 
 viewer.set_view(
-    cesiumkit.Cartesian3.from_degrees(center_lon - 0.005, center_lat - 0.01, 1500),
-    orientation=cesiumkit.HeadingPitchRoll(heading=0.5, pitch=-0.5, roll=0),
+    cesiumkit.Cartesian3.from_degrees(center_lon - 0.003, center_lat - 0.006, 2200),
+    orientation=cesiumkit.HeadingPitchRoll(heading=0.4, pitch=-1.05, roll=0),
 )

@@ -56,8 +56,10 @@ for name, lon, lat, color in cities:
         )
     )
 
-# Position the camera for a dramatic 3/4 view of the globe
+# Straight-down view centered over the Atlantic so NYC, London, São Paulo,
+# and Cape Town are all visible in the same frame. Pitch=-π/2 keeps the
+# globe centered instead of drifting into a corner.
 viewer.set_view(
-    cesiumkit.Cartesian3.from_degrees(-30, 25, 15_000_000),
-    orientation=cesiumkit.HeadingPitchRoll(heading=0, pitch=-1.3, roll=0),
+    cesiumkit.Cartesian3.from_degrees(-20, 10, 14_000_000),
+    orientation=cesiumkit.HeadingPitchRoll(heading=0, pitch=-1.5707963, roll=0),
 )

@@ -22,12 +22,31 @@
         Cesium.Ion.defaultAccessToken = '{{ ion_token }}';
         {% endif %}
 
-        // Cesium 1.107+ automatically falls back to the bundled NaturalEarthII
-        // imagery when no Ion token is set, so we don't need to specify a
-        // baseLayer explicitly. Doing so via ImageryLayer.fromProviderAsync was
-        // leaving the layer stuck in an unready state in headless chromium,
-        // which is why gallery screenshots rendered as empty skybox.
+        {% if not ion_token %}
+        // No Ion token -- explicitly set the base imagery layer to the
+        // NaturalEarthII tiles that Cesium ships on its CDN. We deliberately
+        // avoid `ImageryLayer.fromProviderAsync(...)` here: in headless
+        // chromium the promise chain was leaving the layer stuck with no
+        // attached provider, and the globe rendered as empty skybox. Using
+        // UrlTemplateImageryProvider with a direct template URL bypasses
+        // the async path entirely -- the provider is ready the moment it's
+        // constructed.
+        const _naturalEarthUrl = Cesium.buildModuleUrl("Assets/Textures/NaturalEarthII/") + "{z}/{x}/{reverseY}.jpg";
+        const viewerOptions = Object.assign({{ viewer_options }}, {
+            baseLayer: new Cesium.ImageryLayer(
+                new Cesium.UrlTemplateImageryProvider({
+                    url: _naturalEarthUrl,
+                    tilingScheme: new Cesium.GeographicTilingScheme(),
+                    maximumLevel: 2,
+                    credit: "Natural Earth II"
+                })
+            ),
+            baseLayerPicker: false,
+            geocoder: false,
+        });
+        {% else %}
         const viewerOptions = {{ viewer_options }};
+        {% endif %}
 
         const viewer = new Cesium.Viewer('{{ container_id }}', viewerOptions);
         // Expose the viewer on window so external tools (playwright, devtools,

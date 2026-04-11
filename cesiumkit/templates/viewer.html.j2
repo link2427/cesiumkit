@@ -23,12 +23,23 @@
         {% endif %}
 
         {% if not ion_token %}
-        // No Ion token - use bundled NaturalEarthII imagery so the globe loads without auth
+        // No Ion token -- explicitly set the base imagery layer to the
+        // NaturalEarthII tiles that Cesium ships on its CDN. We deliberately
+        // avoid `ImageryLayer.fromProviderAsync(...)` here: in headless
+        // chromium the promise chain was leaving the layer stuck with no
+        // attached provider, and the globe rendered as empty skybox. Using
+        // UrlTemplateImageryProvider with a direct template URL bypasses
+        // the async path entirely -- the provider is ready the moment it's
+        // constructed.
+        const _naturalEarthUrl = Cesium.buildModuleUrl("Assets/Textures/NaturalEarthII/") + "{z}/{x}/{reverseY}.jpg";
         const viewerOptions = Object.assign({{ viewer_options }}, {
-            baseLayer: Cesium.ImageryLayer.fromProviderAsync(
-                Cesium.TileMapServiceImageryProvider.fromUrl(
-                    Cesium.buildModuleUrl("Assets/Textures/NaturalEarthII")
-                )
+            baseLayer: new Cesium.ImageryLayer(
+                new Cesium.UrlTemplateImageryProvider({
+                    url: _naturalEarthUrl,
+                    tilingScheme: new Cesium.GeographicTilingScheme(),
+                    maximumLevel: 2,
+                    credit: "Natural Earth II"
+                })
             ),
             baseLayerPicker: false,
             geocoder: false,

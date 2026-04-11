@@ -32,15 +32,20 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 GALLERY_DIR = REPO_ROOT / "scripts" / "gallery"
 OUTPUT_DIR = REPO_ROOT / "docs" / "images" / "gallery"
 
-# 16:9 viewport used for all gallery shots — matches the README grid layout
+# 16:9 viewport used for all gallery shots -- matches the README grid layout.
 VIEWPORT = {"width": 1600, "height": 900}
 
 # Max time to wait for Cesium to report that all imagery tiles have loaded.
-# If tiles don't finish (e.g. offline / slow tile server) we fall back to a
-# fixed timeout so the CI job doesn't hang forever. First-time Cesium loads
-# have to fetch the whole CDN bundle, plus we now wait for multi-pass tile
-# loading to stabilize, so be generous.
-TILE_LOAD_TIMEOUT_MS = 45_000
+TILE_LOAD_TIMEOUT_MS = 30_000
+
+# Pin the gallery to Cesium 1.105. Cesium 1.106+ has a bug where its bundled
+# DOMPurify init crashes in headless chromium with "Cannot read properties of
+# null (reading 'createElement')", which breaks the imagery tile loader --
+# tiles get queued but never fetched, so the globe renders as a black sphere
+# against the skybox. 1.105 is the last release that works reliably headless.
+# The library itself still defaults to the latest Cesium for real-browser users;
+# this pin only applies to gallery screenshots.
+CESIUM_VERSION_FOR_SCREENSHOTS = "1.105"
 
 
 def _load_gallery_module(path: Path):
@@ -56,52 +61,49 @@ def _load_gallery_module(path: Path):
 
 
 def _wait_for_cesium_ready(page) -> None:
-    """Fixed 20s wait. See module doc on why we stopped polling tilesLoaded.
+    """Block until Cesium has finished loading its imagery tiles.
 
-    The previous version polled ``globe.tilesLoaded``, but in headless chromium
-    that flag stays false indefinitely even though the network log shows tiles
-    are being fetched -- some combination of the render loop not draining the
-    tile queues on the expected cadence. Since we can't trust the ready signal
-    here, just wait a fixed amount of time that's empirically enough for the
-    Cesium CDN bundle to download, the viewer to initialise, and the initial
-    tile set for our camera view to render.
+    ``globe.tilesLoaded`` returns true whenever the three tile load queues are
+    empty, which is trivially the case at t=0 before Cesium has queued anything.
+    So require an initial false state (real tiles entered the queue) before we
+    start trusting tilesLoaded=true as meaningful.
     """
-    page.wait_for_timeout(20_000)
-
-
-_DIAGNOSTIC_JS = """
-() => {
-    const out = { hasViewer: !!window.viewer };
-    const v = window.viewer;
-    if (!v) return out;
-    out.hasScene = !!v.scene;
-    const globe = v.scene && v.scene.globe;
-    if (!globe) return out;
-    out.tilesLoaded = globe.tilesLoaded;
-    out.baseColor = globe.baseColor && globe.baseColor.toCssColorString();
-    const layers = globe.imageryLayers;
-    out.layerCount = layers.length;
-    out.layers = [];
-    for (let i = 0; i < layers.length; i++) {
-        const l = layers.get(i);
-        const p = l.imageryProvider;
-        out.layers.push({
-            show: l.show,
-            alpha: l.alpha,
-            hasProvider: !!p,
-            providerCtor: p && p.constructor && p.constructor.name,
-            providerReady: p && (p.ready !== undefined ? p.ready : "n/a"),
-            tilingScheme: p && p._tilingScheme && p._tilingScheme.constructor.name,
-        });
-    }
-    return out;
-}
-"""
+    js = f"""
+    () => new Promise(resolve => {{
+        const start = Date.now();
+        let sawLoading = false;
+        const check = () => {{
+            const v = window.viewer;
+            const globe = v && v.scene && v.scene.globe;
+            if (globe) {{
+                if (!globe.tilesLoaded) {{
+                    sawLoading = true;
+                }} else if (sawLoading) {{
+                    requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
+                    return;
+                }}
+            }}
+            if (Date.now() - start > {TILE_LOAD_TIMEOUT_MS}) {{ resolve(false); return; }}
+            setTimeout(check, 100);
+        }};
+        check();
+    }})
+    """
+    try:
+        page.evaluate(js)
+    except Exception:
+        pass
+    # Extra settle for any final render / camera easing.
+    page.wait_for_timeout(1000)
 
 
 def _screenshot_viewer(viewer, out_path: Path) -> None:
     """Render viewer to HTML and screenshot it with playwright."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Pin to a Cesium version that works in headless chromium. See the module
+    # constant's docstring for why.
+    viewer.cesium_version = CESIUM_VERSION_FOR_SCREENSHOTS
 
     with tempfile.TemporaryDirectory(prefix="cesiumkit_gallery_") as tmpdir:
         html_path = os.path.join(tmpdir, "index.html")
@@ -111,42 +113,18 @@ def _screenshot_viewer(viewer, out_path: Path) -> None:
             browser = p.chromium.launch()
             context = browser.new_context(viewport=VIEWPORT)
             page = context.new_page()
-
-            # Diagnostic plumbing: surface any browser-side console errors or
-            # unhandled exceptions into the workflow log so we can see what's
-            # actually breaking inside the headless chromium page.
-            page.on(
-                "console",
-                lambda msg: print(f"    [browser.{msg.type}] {msg.text}"),
-            )
             page.on("pageerror", lambda err: print(f"    [pageerror] {err}"))
-            page.on(
-                "requestfailed",
-                lambda req: print(f"    [requestfailed] {req.url} -- {req.failure}"),
-            )
 
             page.goto(f"file://{html_path}")
             _wait_for_cesium_ready(page)
-
-            try:
-                state = page.evaluate(_DIAGNOSTIC_JS)
-                print(f"    [state] {state}")
-            except Exception as e:
-                print(f"    [state] evaluate failed: {e}")
-
             page.screenshot(path=str(out_path), full_page=False)
             browser.close()
 
 
 def main() -> int:
-    # Force the NaturalEarthII fallback path in the viewer template. Cesium's
-    # default World Imagery (used when an Ion token is set) requires the token
-    # to have access to the specific Ion asset -- if it doesn't, tile requests
-    # silently return empty tiles and the globe renders as a black sphere
-    # against the black skybox, which is exactly the failure mode we've been
-    # chasing. NaturalEarthII is bundled with CesiumJS, needs no auth, and
-    # always renders. To opt back into World Imagery later, remove this line
-    # and ensure CESIUM_ION_TOKEN has the right asset permissions.
+    # Force the no-Ion path in the viewer template so we render NaturalEarthII
+    # (bundled with CesiumJS, no auth needed) instead of World Imagery (which
+    # needs a valid Ion asset token and silently fails if the token is wrong).
     os.environ.pop("CESIUM_ION_TOKEN", None)
 
     if not GALLERY_DIR.exists():

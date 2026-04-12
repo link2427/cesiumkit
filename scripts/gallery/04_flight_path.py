@@ -64,7 +64,9 @@ for label, (lon, lat, _) in [("NYC", arc[0]), ("Paris", arc[-1])]:
         )
     )
 
+# Straight-down over the mid-Atlantic keeps NYC and Paris both in frame
+# without the globe drifting into a corner.
 viewer.set_view(
-    cesiumkit.Cartesian3.from_degrees(-35, 50, 12_000_000),
-    orientation=cesiumkit.HeadingPitchRoll(heading=0, pitch=-1.1, roll=0),
+    cesiumkit.Cartesian3.from_degrees(-35, 50, 13_000_000),
+    orientation=cesiumkit.HeadingPitchRoll(heading=0, pitch=-1.5707963, roll=0),
 )

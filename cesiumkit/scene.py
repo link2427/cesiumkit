@@ -23,6 +23,8 @@ class SceneConfig(CesiumBase):
     fog_enabled: bool | None = None
     background_color: Any = None
     order_independent_translucency: bool | None = None
+    request_render_mode: bool | None = None
+    maximum_render_time_change: float | None = None
 
     def _js_class_name(self) -> str:
         return "scene"
@@ -48,4 +50,8 @@ class SceneConfig(CesiumBase):
             stmts.append(
                 f"{viewer_var}.scene.orderIndependentTranslucency = {str(self.order_independent_translucency).lower()};"
             )
+        if self.request_render_mode is not None:
+            stmts.append(f"{viewer_var}.scene.requestRenderMode = {str(self.request_render_mode).lower()};")
+        if self.maximum_render_time_change is not None:
+            stmts.append(f"{viewer_var}.scene.maximumRenderTimeChange = {self.maximum_render_time_change};")
         return stmts

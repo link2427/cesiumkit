@@ -53,3 +53,30 @@ class IonTerrainProvider(TerrainProvider):
             opts_str = ", ".join(f"{k}: {str(v).lower()}" for k, v in opts.items())
             return f"Cesium.createWorldTerrainAsync({{{opts_str}}})"
         return "Cesium.createWorldTerrainAsync()"
+
+
+class WmsTerrainProvider(TerrainProvider):
+    """Provides terrain data from a WMS (Web Map Service) elevation endpoint.
+
+    Useful for organizations serving terrain via WMS rather than
+    Cesium's quantized-mesh format.
+    """
+
+    url: str
+    layers: str = ""
+    format: str = "image/png"
+    minimum_level: int = 0
+    maximum_level: int = 15
+
+    def _js_class_name(self) -> str:
+        return "Cesium.WebMapServiceTerrainProvider"
+
+    def to_js(self) -> str:
+        opts = []
+        opts.append(f"url: '{self.url}'")
+        if self.layers:
+            opts.append(f"layers: '{self.layers}'")
+        opts.append(f"format: '{self.format}'")
+        opts.append(f"minimumLevel: {self.minimum_level}")
+        opts.append(f"maximumLevel: {self.maximum_level}")
+        return f"new Cesium.WebMapServiceTerrainProvider({{{', '.join(opts)}}})"

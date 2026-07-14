@@ -265,6 +265,36 @@ class Viewer:
         """
         self._send_command(f"viewer.clock.multiplier = {multiplier};")
 
+    # --- Runtime data source updates ---
+
+    def update_czml(self, url: str) -> None:
+        """Replace the first CZML data source with new data from a URL.
+
+        Requires the viewer to be running via ``show()``.
+
+        Example: ``viewer.update_czml(\"https://example.com/live.czml\")``
+        """
+        self._send_command(
+            "const ds = viewer.dataSources;"
+            "const czml = ds.get(0);"
+            "if (czml) ds.remove(czml);"
+            f"ds.add(Cesium.CzmlDataSource.load('{url}'));"
+        )
+
+    def update_geojson(self, url: str) -> None:
+        """Replace the first GeoJSON data source with new data from a URL.
+
+        Requires the viewer to be running via ``show()``.
+
+        Example: ``viewer.update_geojson(\"https://example.com/data.geojson\")``
+        """
+        self._send_command(
+            "const ds = viewer.dataSources;"
+            "const gj = ds.get(0);"
+            "if (gj) ds.remove(gj);"
+            f"ds.add(Cesium.GeoJsonDataSource.load('{url}'));"
+        )
+
     # --- Serialization helpers ---
 
     def _build_viewer_options_js(self) -> str:

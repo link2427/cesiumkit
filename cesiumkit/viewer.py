@@ -265,6 +265,38 @@ class Viewer:
         """
         self._send_command(f"viewer.clock.multiplier = {multiplier};")
 
+    # --- Entity picking and selection ---
+
+    def select_entity(self, entity_id: str) -> None:
+        """Select an entity by ID, highlighting it in the viewer.
+
+        Requires the viewer to be running via ``show()``.
+
+        Example: ``viewer.select_entity(\"sat-1\")``
+        """
+        self._send_command(
+            f"const e = viewer.entities.getById('{entity_id}');"
+            "if (e) viewer.selectedEntity = e;"
+        )
+
+    def deselect(self) -> None:
+        """Deselect the currently selected entity.
+
+        Requires the viewer to be running via ``show()``.
+        """
+        self._send_command("viewer.selectedEntity = undefined;")
+
+    def _get_selected_entity_id(self) -> str | None:
+        """Get the ID of the currently selected entity.
+
+        Returns None if nothing is selected or the viewer is not running.
+        """
+        if self._server is None:
+            return None
+        # Send JS to store the ID in a window variable, then read it
+        # via the command queue's side channel
+        return None  # Placeholder — requires JS→Python return channel
+
     # --- Serialization helpers ---
 
     def _build_viewer_options_js(self) -> str:

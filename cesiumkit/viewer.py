@@ -125,6 +125,11 @@ class Viewer:
         self._event_handlers: list[EventHandler] = []
         self._custom_scripts: list[str] = []
 
+        # Runtime command queue (for live viewer control)
+        self._command_seq: int = 0
+        self._command_queue: list[dict] = []
+        self._server: Any = None
+
     # --- Entity convenience methods ---
 
     def add_entity(self, entity: Any = None, **kwargs: Any) -> Any:
@@ -227,6 +232,38 @@ class Viewer:
     def look_at(self, target: Any, offset: Any) -> None:
         """Point the camera at a target."""
         self.camera.look_at(target, offset)
+
+    # --- Runtime clock control ---
+
+    def _send_command(self, js: str) -> None:
+        """Queue a JS command for the live viewer to execute."""
+        self._command_seq += 1
+        self._command_queue.append({"seq": self._command_seq, "js": js})
+
+    def set_time(self, iso_string: str) -> None:
+        """Jump the timeline to a specific ISO 8601 epoch and update the widget.
+
+        Example: ``viewer.set_time(\"2024-03-15T03:00:00Z\")``
+        """
+        self._send_command(
+            f"viewer.clock.currentTime = Cesium.JulianDate.fromIso8601('{iso_string}');"
+            "viewer.timeline.updateFromClock();"
+        )
+
+    def animate(self, on: bool = True) -> None:
+        """Start or stop clock playback.
+
+        Example: ``viewer.animate(on=False)`` to pause.
+        """
+        val = "true" if on else "false"
+        self._send_command(f"viewer.clock.shouldAnimate = {val};")
+
+    def set_multiplier(self, multiplier: float) -> None:
+        """Change the clock playback speed.
+
+        Example: ``viewer.set_multiplier(3600)`` for 1 hour per second.
+        """
+        self._send_command(f"viewer.clock.multiplier = {multiplier};")
 
     # --- Serialization helpers ---
 
@@ -339,8 +376,41 @@ class Viewer:
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, directory=tmpdir, **kwargs)
 
+            def do_GET(self):
+                if self.path.startswith("/__cesiumkit_cmd"):
+                    self._handle_command_poll()
+                    return
+                super().do_GET()
+
+            def _handle_command_poll(self):
+                from urllib.parse import urlparse, parse_qs
+                import json
+
+                parsed = urlparse(self.path)
+                params = parse_qs(parsed.query)
+                client_seq = int(params.get("seq", [0])[0])
+
+                # Return next command the client hasn't seen
+                if self._viewer._command_queue:
+                    cmd = self._viewer._command_queue[0]
+                    if cmd["seq"] > client_seq:
+                        self._viewer._command_queue.pop(0)
+                        body = json.dumps(cmd).encode("utf-8")
+                    else:
+                        body = b"{}"
+                else:
+                    body = b"{}"
+
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
             def log_message(self, format, *args):
                 pass  # Suppress request logs
+
+        Handler._viewer = self  # Attach viewer for command queue access
 
         server = HTTPServer(("127.0.0.1", port), Handler)
         actual_port = server.server_address[1]

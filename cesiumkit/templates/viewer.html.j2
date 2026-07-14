@@ -102,6 +102,20 @@
         {% for custom_js in custom_scripts %}
         {{ custom_js }}
         {% endfor %}
+
+        // ── Runtime command polling (cesiumkit >={{ cesium_version }}) ──
+        let _cesiumkitCmdSeq = 0;
+        setInterval(async () => {
+            try {
+                const resp = await fetch('/__cesiumkit_cmd?seq=' + _cesiumkitCmdSeq);
+                if (!resp.ok) return;
+                const cmd = await resp.json();
+                if (cmd.js) {
+                    eval(cmd.js);
+                    _cesiumkitCmdSeq = cmd.seq;
+                }
+            } catch (_) { /* server not ready yet — ignore */ }
+        }, 500);
     </script>
 </body>
 </html>

@@ -129,6 +129,7 @@ class Viewer:
         self._command_seq: int = 0
         self._command_queue: list[dict] = []
         self._server: Any = None
+        self._pending_result: dict | None = None  # JS→Python return channel
 
     # --- Entity convenience methods ---
 
@@ -265,6 +266,44 @@ class Viewer:
         """
         self._send_command(f"viewer.clock.multiplier = {multiplier};")
 
+    # --- Screenshot export ---
+
+    def screenshot(self, path: str, *, timeout: float = 10.0) -> None:
+        """Save a PNG screenshot of the current viewer.
+
+        Requires the viewer to be running via ``show()``.
+        Blocks until captured or *timeout* seconds elapse.
+
+        Example: ``viewer.screenshot(\"output.png\")``
+        """
+        import base64
+        import time as _time
+
+        self._pending_result = None
+        self._send_command(
+            "const canvas = viewer.scene.canvas;"
+            "const dataUrl = canvas.toDataURL('image/png');"
+            "fetch('/__cesiumkit_result', {"
+            "  method: 'POST',"
+            "  headers: {'Content-Type': 'application/json'},"
+            "  body: JSON.stringify({screenshot: dataUrl.split(',')[1]})"
+            "});"
+        )
+
+        deadline = _time.time() + timeout
+        while _time.time() < deadline:
+            if self._pending_result and "screenshot" in self._pending_result:
+                png_data = base64.b64decode(self._pending_result["screenshot"])
+                with open(path, "wb") as f:
+                    f.write(png_data)
+                self._pending_result = None
+                return
+            _time.sleep(0.1)
+
+        raise TimeoutError(
+            f"Screenshot timed out after {timeout}s"
+        )
+
     # --- Serialization helpers ---
 
     def _build_viewer_options_js(self) -> str:
@@ -382,6 +421,13 @@ class Viewer:
                     return
                 super().do_GET()
 
+            def do_POST(self):
+                if self.path.startswith("/__cesiumkit_result"):
+                    self._handle_result_post()
+                    return
+                self.send_response(405)
+                self.end_headers()
+
             def _handle_command_poll(self):
                 from urllib.parse import urlparse, parse_qs
                 import json
@@ -409,6 +455,17 @@ class Viewer:
 
             def log_message(self, format, *args):
                 pass  # Suppress request logs
+
+            def _handle_result_post(self):
+                import json
+                content_len = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_len)
+                data = json.loads(body)
+                self._viewer._pending_result = data
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"ok": true}')
 
         Handler._viewer = self  # Attach viewer for command queue access
 

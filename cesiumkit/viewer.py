@@ -125,6 +125,14 @@ class Viewer:
         self._event_handlers: list[EventHandler] = []
         self._custom_scripts: list[str] = []
 
+        # Runtime command queue and callback bridge
+        self._command_seq: int = 0
+        self._command_queue: list[dict] = []
+        self._server: Any = None
+        self._pending_result: dict | None = None
+        self._python_callbacks: list = []
+        self._python_bridge_registered: bool = False
+
     # --- Entity convenience methods ---
 
     def add_entity(self, entity: Any = None, **kwargs: Any) -> Any:
@@ -209,6 +217,28 @@ class Viewer:
         if isinstance(handler, str):
             handler = JsCode(handler)
         self._event_handlers.append(EventHandler(event_type=event_type, handler=handler))
+
+    def on_click(self, callback) -> None:
+        """Register a Python callback for left-click events on entities.
+
+        The callback receives the clicked entity ID (str) or None.
+        Requires the viewer to be running via show().
+        """
+        self._python_callbacks.append(callback)
+        if not self._python_bridge_registered:
+            self._python_bridge_registered = True
+            self.add_script(
+                "const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);"
+                "handler.setInputAction(function(movement) {"
+                "  var picked = viewer.scene.pick(movement.endPosition);"
+                "  var eid = picked && picked.id ? picked.id._id : null;"
+                "  fetch('/__cesiumkit_result', {"
+                "    method: 'POST',"
+                "    headers: {'Content-Type': 'application/json'},"
+                "    body: JSON.stringify({click_entity: eid})"
+                "  });"
+                "}, Cesium.ScreenSpaceEventType.LEFT_CLICK);"
+            )
 
     def add_script(self, js_code: str) -> None:
         """Add custom JavaScript code to be executed after viewer setup."""
@@ -338,6 +368,28 @@ class Viewer:
         class Handler(SimpleHTTPRequestHandler):
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, directory=tmpdir, **kwargs)
+
+            def do_POST(self):
+                if self.path.startswith("/__cesiumkit_result"):
+                    import json
+                    content_len = int(self.headers.get("Content-Length", 0))
+                    body = self.rfile.read(content_len)
+                    data = json.loads(body)
+                    self._viewer._pending_result = data
+                    if "click_entity" in data and self._viewer._python_callbacks:
+                        eid = data["click_entity"]
+                        for cb in self._viewer._python_callbacks:
+                            try:
+                                cb(eid)
+                            except Exception:
+                                pass
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(b'{"ok": true}')
+                    return
+                self.send_response(405)
+                self.end_headers()
 
             def log_message(self, format, *args):
                 pass  # Suppress request logs

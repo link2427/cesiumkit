@@ -136,6 +136,36 @@ class Viewer:
         """Add an entity. Can pass an Entity instance or keyword args."""
         return self.entities.add(entity, **kwargs)
 
+    def remove_entity(self, entity: Any) -> bool:
+        """Remove an entity from the viewer.
+
+        Returns True if the entity was found and removed.
+        """
+        return self.entities.remove(entity)
+
+    def remove_entity_by_id(self, entity_id: str) -> bool:
+        """Remove an entity by its ID.
+
+        Returns True if the entity was found and removed.
+        """
+        entity = self.entities.get_by_id(entity_id)
+        if entity is not None:
+            return self.entities.remove(entity)
+        return False
+
+    def clear_entities(self) -> None:
+        """Remove all entities from the viewer."""
+        self.entities.remove_all()
+
+    def get_entity(self, entity_id: str) -> Any | None:
+        """Get an entity by its ID, or None if not found."""
+        return self.entities.get_by_id(entity_id)
+
+    @property
+    def entity_count(self) -> int:
+        """Number of entities currently in the viewer."""
+        return len(self.entities)
+
     def add_geodataframe(self, gdf: Any, **options: Any) -> list[Any]:
         """Add all features from a ``geopandas.GeoDataFrame`` to this Viewer.
 

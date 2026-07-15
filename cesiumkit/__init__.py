@@ -147,6 +147,8 @@ from cesiumkit.terrain import (
     EllipsoidTerrainProvider,
     IonTerrainProvider,
     TerrainProvider,
+    WmsTerrainProvider,
+    WmtsTerrainProvider,
 )
 
 # Viewer — the main entry point
@@ -265,6 +267,8 @@ __all__ = [
     "EllipsoidTerrainProvider",
     "CesiumTerrainProvider",
     "IonTerrainProvider",
+    "WmsTerrainProvider",
+    "WmtsTerrainProvider",
     # Camera
     "Camera",
     "CameraPosition",

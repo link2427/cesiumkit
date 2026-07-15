@@ -137,6 +137,25 @@ class TestViewer:
         assert "Cesium3DTileset" in html
         assert "75343" in html
 
+    def test_add_particle_system_primitive(self):
+        v = cesiumkit.Viewer()
+        particle = v.add_particle_system(
+            image="smoke.png",
+            emission_rate=10,
+            particle_life=2,
+            start_scale=1,
+            end_scale=0.1,
+        )
+        assert isinstance(particle, cesiumkit.ParticleSystem)
+        html = v.to_html()
+        assert "viewer.scene.primitives.add" in html
+        assert "new Cesium.ParticleSystem" in html
+        assert 'image: "smoke.png"' in html
+
+    def test_particle_system_validates_ranges(self):
+        with pytest.raises(ValueError, match="maximum_speed"):
+            cesiumkit.ParticleSystem(image="smoke.png", minimum_speed=10, maximum_speed=5)
+
     def test_event_handler(self):
         v = cesiumkit.Viewer()
         v.on(

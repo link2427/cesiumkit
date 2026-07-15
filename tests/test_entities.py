@@ -1,7 +1,10 @@
 """Tests for cesiumkit entity system."""
 
+import pytest
+from pydantic import ValidationError
+
 from cesiumkit.color import RED
-from cesiumkit.coordinates import Cartesian3, RectangleCoords
+from cesiumkit.coordinates import Cartesian2, Cartesian3, RectangleCoords
 from cesiumkit.entities._base import Entity, EntityCollection
 from cesiumkit.entities.billboard import BillboardGraphics
 from cesiumkit.entities.box import BoxGraphics
@@ -12,6 +15,7 @@ from cesiumkit.entities.ellipsoid import EllipsoidGraphics
 from cesiumkit.entities.label import LabelGraphics
 from cesiumkit.entities.model import ModelGraphics
 from cesiumkit.entities.path import PathGraphics
+from cesiumkit.entities.plane import Plane, PlaneGraphics
 from cesiumkit.entities.point import PointGraphics
 from cesiumkit.entities.polygon import PolygonGraphics, PolygonHierarchy
 from cesiumkit.entities.polyline import PolylineGraphics
@@ -160,6 +164,26 @@ class TestPathGraphics:
         js = p.to_js()
         assert "width" in js
         assert "trailTime" in js
+
+
+class TestPlaneGraphics:
+    def test_entity_serialization(self):
+        plane = Plane(normal=Cartesian3(x=0, y=0, z=1), distance=0)
+        entity = Entity(
+            plane=PlaneGraphics(
+                plane=plane,
+                dimensions=Cartesian2(x=100, y=200),
+                material=RED,
+            )
+        )
+        js = entity.to_js()
+        assert "plane:" in js
+        assert "new Cesium.Plane" in js
+        assert "new Cesium.Cartesian2(100.0, 200.0)" in js
+
+    def test_plane_distance_must_be_finite(self):
+        with pytest.raises(ValidationError):
+            Plane(normal=Cartesian3(x=0, y=0, z=1), distance=float("inf"))
 
 
 class TestEntity:

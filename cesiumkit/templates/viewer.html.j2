@@ -91,6 +91,10 @@
         })();
         {% endfor %}
 
+        {% for primitive_js in primitives %}
+        viewer.scene.primitives.add({{ primitive_js }});
+        {% endfor %}
+
         {% for camera_op in camera_operations %}
         {{ camera_op }}
         {% endfor %}

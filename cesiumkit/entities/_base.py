@@ -68,6 +68,7 @@ _GRAPHICS_FIELDS = [
     "label",
     "model",
     "path",
+    "plane",
     "point",
     "polygon",
     "polyline",
@@ -107,6 +108,7 @@ class Entity(CesiumBase):
     label: Any = None
     model: Any = None
     path: Any = None
+    plane: Any = None
     point: Any = None
     polygon: Any = None
     polyline: Any = None

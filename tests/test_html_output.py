@@ -1,5 +1,8 @@
 """Integration tests for full HTML output."""
 
+import pytest
+from pydantic import ValidationError
+
 import cesiumkit
 
 
@@ -106,6 +109,24 @@ class TestFullHtmlOutput:
         html = viewer.to_html()
         assert "enableLighting = true" in html
         assert "depthTestAgainstTerrain = true" in html
+
+    def test_scene_with_terrain_exaggeration(self):
+        viewer = cesiumkit.Viewer(
+            globe=cesiumkit.GlobeConfig(
+                terrain_exaggeration=3.0,
+                terrain_exaggeration_relative_height=100.0,
+            )
+        )
+        html = viewer.to_html()
+        assert "scene.verticalExaggeration = 3.0" in html
+        assert "scene.verticalExaggerationRelativeHeight = 100.0" in html
+        assert "globe.terrainExaggeration" not in html
+
+    def test_terrain_exaggeration_validation(self):
+        with pytest.raises(ValidationError):
+            cesiumkit.GlobeConfig(terrain_exaggeration=-1)
+        with pytest.raises(ValidationError):
+            cesiumkit.GlobeConfig(terrain_exaggeration_relative_height=float("inf"))
 
     def test_scene_with_scene_config(self):
         viewer = cesiumkit.Viewer(

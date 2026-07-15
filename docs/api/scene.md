@@ -40,3 +40,19 @@ viewer = cesiumkit.Viewer(
 
 `SceneConfig` also exposes `request_render_mode` and
 `maximum_render_time_change` for post-construction scene configuration.
+
+## Post-processing
+
+Bloom, FXAA, and ambient occlusion are independently configurable. No stages
+are changed unless a config is explicitly supplied:
+
+```python
+scene = cesiumkit.SceneConfig(
+    post_process=cesiumkit.PostProcessConfig(
+        bloom=cesiumkit.BloomConfig(enabled=True, contrast=128, brightness=-0.3),
+        fxaa=cesiumkit.FXAAConfig(enabled=True),
+        ambient_occlusion=cesiumkit.AmbientOcclusionConfig(enabled=True, intensity=1),
+    )
+)
+viewer = cesiumkit.Viewer(scene=scene)
+```

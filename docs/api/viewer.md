@@ -48,6 +48,23 @@ all_picked = viewer.drill_pick(cesiumkit.Cartesian2(x=100, y=200))
 viewer.deselect()
 ```
 
+## Python click events
+
+Register callbacks before or after `show()` starts, or synchronously wait for
+the next click. A click on an entity returns its public ID; a click on empty
+space returns `None`:
+
+```python
+viewer.on_click(lambda entity_id: print("clicked", entity_id))
+
+# Run viewer.show() in another thread, then:
+entity_id = viewer.wait_for_click(timeout=30)
+```
+
+`wait_for_click()` raises `TimeoutError` when no click arrives before the
+timeout. Callback exceptions are logged and do not prevent other callbacks
+from running.
+
 ## Screenshots
 
 Capture the live canvas as a file, base64 text, or a Pillow image:

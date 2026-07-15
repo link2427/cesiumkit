@@ -5,13 +5,15 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+import logging
 import math
+import queue
 import tempfile
 import threading
 import time
 import webbrowser
 from collections import deque
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from io import BytesIO
 from os import PathLike
 from pathlib import Path
@@ -24,6 +26,8 @@ from cesiumkit.czml import CzmlDocument
 from cesiumkit.enums import SceneMode, ScreenSpaceEventType
 from cesiumkit.events import EventHandler
 from cesiumkit.utils import JsCode
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from PIL.Image import Image as PILImage
@@ -169,6 +173,9 @@ class Viewer:
         self._runtime_errors: dict[str, str] = {}
         self._runtime_condition = threading.Condition()
         self._server: Any = None
+        self._click_callbacks: list[Callable[[str | None], None]] = []
+        self._click_events: queue.Queue[str | None] = queue.Queue()
+        self._click_bridge_registered = False
 
     # --- Entity convenience methods ---
 
@@ -299,6 +306,74 @@ class Viewer:
         if isinstance(handler, str):
             handler = JsCode(handler)
         self._event_handlers.append(EventHandler(event_type=event_type, handler=handler))
+
+    def on_click(self, callback: Callable[[str | None], None]) -> None:
+        """Register a Python callback for left-click events on entities.
+
+        The callback receives the public Cesium entity ID, or ``None`` when
+        the click did not hit an entity. The bridge works when registered
+        before or after :meth:`show` starts.
+        """
+        if not callable(callback):
+            raise TypeError("callback must be callable")
+        self._click_callbacks.append(callback)
+        self._ensure_click_bridge()
+
+    def _ensure_click_bridge(self) -> None:
+        """Register the browser-side click handler exactly once."""
+        if self._click_bridge_registered:
+            return
+
+        self._click_bridge_registered = True
+        script = self._click_bridge_js()
+        if self._server is None:
+            self.add_script(script)
+        else:
+            self._send_command(script)
+
+    def wait_for_click(self, timeout: float | None = 30.0) -> str | None:
+        """Wait for the next left click and return its entity ID, if any.
+
+        Raises :class:`TimeoutError` if no click arrives within ``timeout``.
+        Pass ``None`` to wait indefinitely.
+        """
+        if timeout is not None and (not math.isfinite(timeout) or timeout < 0):
+            raise ValueError("timeout must be a finite non-negative number or None")
+        self._ensure_click_bridge()
+        try:
+            return self._click_events.get(timeout=timeout)
+        except queue.Empty as exc:
+            raise TimeoutError(f"No click received within {timeout:g}s") from exc
+
+    @staticmethod
+    def _click_bridge_js() -> str:
+        return (
+            "(() => {"
+            "if (window.__cesiumkitClickHandler) window.__cesiumkitClickHandler.destroy();"
+            "const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);"
+            "window.__cesiumkitClickHandler = handler;"
+            "handler.setInputAction(async (movement) => {"
+            "const picked = viewer.scene.pick(movement.position);"
+            "const entityId = picked && picked.id && picked.id.id != null ? String(picked.id.id) : null;"
+            "try { await __cesiumkitPostEvent('click', entityId); }"
+            "catch (error) { console.error('cesiumkit click event failed:', error); }"
+            "}, Cesium.ScreenSpaceEventType.LEFT_CLICK);"
+            "})();"
+        )
+
+    def _handle_runtime_event(self, event: str, result: Any) -> None:
+        """Dispatch an event received from the browser bridge."""
+        if event != "click":
+            raise ValueError(f"Unsupported runtime event: {event}")
+        if result is not None and not isinstance(result, str):
+            raise TypeError("Click event result must be a string or null")
+
+        self._click_events.put(result)
+        for callback in tuple(self._click_callbacks):
+            try:
+                callback(result)
+            except Exception:
+                logger.exception("Unhandled exception in cesiumkit click callback")
 
     def add_script(self, js_code: str) -> None:
         """Add custom JavaScript code to be executed after viewer setup."""
@@ -768,10 +843,19 @@ class Viewer:
 
                 try:
                     data = json.loads(self.rfile.read(content_length))
+                    if not isinstance(data, dict):
+                        raise TypeError
+                    if "event" in data:
+                        event = data["event"]
+                        if not isinstance(event, str):
+                            raise TypeError
+                        self._viewer._handle_runtime_event(event, data.get("result"))
+                        self._send_json_success()
+                        return
                     request_id = data["requestId"]
                     if not isinstance(request_id, str):
                         raise TypeError
-                except (json.JSONDecodeError, KeyError, TypeError):
+                except (json.JSONDecodeError, KeyError, TypeError, ValueError):
                     self.send_error(400, "Invalid result payload")
                     return
 
@@ -782,6 +866,9 @@ class Viewer:
                         self._viewer._runtime_results[request_id] = data.get("result")
                     self._viewer._runtime_condition.notify_all()
 
+                self._send_json_success()
+
+            def _send_json_success(self):
                 body = b'{"ok":true}'
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")

@@ -117,6 +117,15 @@
             if (!response.ok) throw new Error('Failed to return runtime command result');
         }
 
+        async function __cesiumkitPostEvent(event, result) {
+            const response = await fetch('/__cesiumkit_result', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({event, result}),
+            });
+            if (!response.ok) throw new Error('Failed to return runtime event');
+        }
+
         let _cesiumkitCmdSeq = 0;
         async function _cesiumkitPollCommands() {
             try {

@@ -166,6 +166,56 @@ class TestViewer:
         assert "ScreenSpaceEventHandler" in html
         assert "LEFT_CLICK" in html
 
+    def test_python_click_bridge_uses_public_entity_id_and_click_position(self):
+        v = cesiumkit.Viewer()
+        v.on_click(lambda entity_id: None)
+        html = v.to_html()
+        assert "movement.position" in html
+        assert "picked.id.id" in html
+        assert "endPosition" not in html
+        assert "picked.id._id" not in html
+        assert "__cesiumkitPostEvent('click', entityId)" in html
+
+    def test_python_click_bridge_is_registered_once(self):
+        v = cesiumkit.Viewer()
+        v.on_click(lambda entity_id: None)
+        v.on_click(lambda entity_id: None)
+        assert v.to_html().count("window.__cesiumkitClickHandler = handler") == 1
+
+    def test_python_click_callbacks_and_waiter_receive_event(self):
+        received = []
+        v = cesiumkit.Viewer()
+        v.on_click(received.append)
+        v._handle_runtime_event("click", "sat-1")
+        assert received == ["sat-1"]
+        assert v.wait_for_click(timeout=0) == "sat-1"
+
+    def test_wait_for_click_times_out(self):
+        v = cesiumkit.Viewer()
+        with pytest.raises(TimeoutError, match="No click"):
+            v.wait_for_click(timeout=0)
+        assert "ScreenSpaceEventHandler" in v.to_html()
+
+    def test_click_callback_exceptions_are_logged(self, caplog):
+        v = cesiumkit.Viewer()
+
+        def broken_callback(entity_id):
+            raise RuntimeError("boom")
+
+        v.on_click(broken_callback)
+        v._handle_runtime_event("click", None)
+        assert "Unhandled exception" in caplog.text
+
+    def test_on_click_after_show_queues_runtime_registration(self):
+        v = cesiumkit.Viewer()
+        v._server = object()
+        v.on_click(lambda entity_id: None)
+        assert "ScreenSpaceEventHandler" in v._command_queue[-1]["js"]
+
+    def test_on_click_requires_callable(self):
+        with pytest.raises(TypeError, match="callable"):
+            cesiumkit.Viewer().on_click(None)
+
     def test_runtime_clock_commands_escape_input(self):
         v = cesiumkit.Viewer()
         v.set_time("2024-01-01T00:00:00Z'); alert('nope")

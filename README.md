@@ -125,6 +125,21 @@ entity = cesiumkit.Entity(name="Flight", position=prop,
                           path=cesiumkit.PathGraphics(width=2, material=cesiumkit.Color.YELLOW))
 ```
 
+### Live runtime control
+
+Control a running viewer from Python: update the clock and data sources,
+select or pick entities, receive click callbacks, and capture screenshots.
+
+```python
+viewer.set_time("2026-07-14T18:00:00Z")
+viewer.set_multiplier(60)
+viewer.animate(True)
+viewer.on_click(lambda entity_id: print("clicked", entity_id))
+```
+
+See the [runtime control guide](https://link2427.github.io/cesiumkit/runtime-control/)
+for the server lifecycle and complete examples.
+
 ### Data sources
 
 Load GeoJSON, CZML, and KML directly.
@@ -194,12 +209,13 @@ viewer.on(
 - **Time-dynamic properties**: SampledPositionProperty, SampledProperty, ConstantProperty, TimeIntervalCollectionProperty, ReferenceProperty, CompositeProperty
 - **Data sources**: GeoJSON, CZML, KML, custom
 - **Imagery providers**: Bing, OSM, Mapbox, WMTS, WMS, URL template, Ion, TMS
-- **Terrain providers**: Ion world terrain, Ion asset, ellipsoid
+- **Terrain providers**: Ion world terrain, Ion asset, ellipsoid, encoded WMS/WMTS heightmaps
 - **Camera operations**: fly_to, set_view, look_at
 - **CZML export**: to_czml_string(), save_czml(), CzmlDocument
 - **Cesium Ion**: token management, 3D Tilesets, terrain
-- **Scene/Globe configuration**: fog, lighting, shadows, depth test, atmosphere
-- **Event handling**: ScreenSpaceEventHandler with custom JS callbacks
+- **Scene/Globe configuration**: fog, lighting, shadows, depth test, atmosphere, post-processing, terrain exaggeration
+- **Runtime control**: clock, live CZML/GeoJSON, selection, picking, screenshots, and Python click callbacks
+- **Event handling**: ScreenSpaceEventHandler with custom JS or Python callbacks
 - **Custom JavaScript injection**: add_script() for arbitrary JS
 - **Local HTTP server**: `show()` launches a server and opens the browser
 - **Works without Ion token**: falls back to bundled NaturalEarthII imagery
@@ -222,20 +238,21 @@ viewer.on(
 
 ## Examples
 
-The [`examples/`](examples/) directory contains 10 runnable scripts:
+The [`examples/`](examples/) directory contains 11 runnable scripts:
 
 | # | File | What it shows |
 |---|------|---------------|
-| 01 | `basic_point.py` | Minimal point on the globe |
-| 02 | `multiple_entities.py` | Points, labels, polygons, polylines |
-| 03 | `materials.py` | Stripe, grid, glow, dash materials |
-| 04 | `imagery_providers.py` | OpenStreetMap, Bing, custom layers |
-| 05 | `time_dynamic.py` | Animated flight path with clock |
-| 06 | `data_sources.py` | GeoJSON, CZML, KML loading |
-| 07 | `3d_models_and_tilesets.py` | glTF models and 3D Tiles |
-| 08 | `czml_export.py` | Export entities to CZML format |
-| 09 | `camera_controls.py` | fly_to, set_view, look_at |
-| 10 | `event_handlers.py` | Click events and custom JS |
+| 01 | `01_basic_point.py` | Minimal point on the globe |
+| 02 | `02_shapes_and_materials.py` | Points, labels, shapes, and materials |
+| 03 | `03_multiple_cities.py` | Multiple entities on the globe |
+| 04 | `04_time_dynamic_satellite.py` | Animated satellite path with clock |
+| 05 | `05_geojson_and_datasources.py` | GeoJSON, CZML, and KML loading |
+| 06 | `06_terrain_and_imagery.py` | Terrain and imagery providers |
+| 07 | `07_3d_models_and_tilesets.py` | glTF models and 3D Tiles |
+| 08 | `08_czml_export.py` | Export entities to CZML format |
+| 09 | `09_camera_controls.py` | `fly_to`, `set_view`, and `look_at` |
+| 10 | `10_event_handlers.py` | Click events and custom JavaScript |
+| 11 | `11_runtime_control.py` | Live controls and Python click callbacks |
 
 Run any example:
 

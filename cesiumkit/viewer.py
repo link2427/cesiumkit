@@ -6,8 +6,10 @@ import json
 import math
 import tempfile
 import threading
+import time
 import webbrowser
 from collections import deque
+from collections.abc import Iterable
 from typing import Any
 from uuid import uuid4
 
@@ -348,6 +350,101 @@ class Viewer:
         if not isinstance(result, str):
             raise RuntimeError("Browser returned a non-string clock value")
         return result
+
+    # --- Runtime data source updates ---
+
+    @staticmethod
+    def _data_source_update_js(source: Any, cesium_class: str) -> str:
+        """Build an async command that replaces the first matching data source."""
+        source_js = json.dumps(source)
+        return (
+            "(async () => {"
+            f"const replacement = await Cesium.{cesium_class}.load({source_js});"
+            "const collection = viewer.dataSources;"
+            "let existing;"
+            "for (let index = 0; index < collection.length; index += 1) {"
+            "const candidate = collection.get(index);"
+            f"if (candidate instanceof Cesium.{cesium_class}) {{ existing = candidate; break; }}"
+            "}"
+            "if (existing) collection.remove(existing, true);"
+            "await collection.add(replacement);"
+            "viewer.scene.requestRender();"
+            "})();"
+        )
+
+    def update_czml(self, source: str | list[dict[str, Any]]) -> None:
+        """Replace the first live CZML data source from a URL or CZML packets."""
+        self._send_command(self._data_source_update_js(source, "CzmlDataSource"))
+
+    def update_geojson(self, source: str | dict[str, Any]) -> None:
+        """Replace the first live GeoJSON data source from a URL or mapping."""
+        self._send_command(self._data_source_update_js(source, "GeoJsonDataSource"))
+
+    def poll_czml(self, url: str, *, interval: float = 5.0) -> str:
+        """Refresh CZML from *url* in the browser at a fixed interval.
+
+        Returns an identifier that can be passed to :meth:`stop_polling`.
+        """
+        if not math.isfinite(interval) or interval <= 0:
+            raise ValueError("interval must be a positive finite number")
+
+        poller_id = uuid4().hex
+        poller_id_js = json.dumps(poller_id)
+        url_js = json.dumps(url)
+        interval_ms = interval * 1000
+        self._send_command(
+            "(async () => {"
+            "window.__cesiumkitPollers ??= new Map();"
+            f"const pollerId = {poller_id_js};"
+            f"const source = {url_js};"
+            "const refresh = async () => {"
+            "const replacement = await Cesium.CzmlDataSource.load(source);"
+            "const collection = viewer.dataSources;"
+            "let existing;"
+            "for (let index = 0; index < collection.length; index += 1) {"
+            "const candidate = collection.get(index);"
+            "if (candidate instanceof Cesium.CzmlDataSource) { existing = candidate; break; }"
+            "}"
+            "if (existing) collection.remove(existing, true);"
+            "await collection.add(replacement);"
+            "viewer.scene.requestRender();"
+            "};"
+            "await refresh();"
+            f"const timer = setInterval(() => refresh().catch(console.error), {interval_ms});"
+            "window.__cesiumkitPollers.set(pollerId, timer);"
+            "})();"
+        )
+        return poller_id
+
+    def stop_polling(self, poller_id: str) -> None:
+        """Stop a browser-side data-source poller."""
+        poller_id_js = json.dumps(poller_id)
+        self._send_command(
+            "if (window.__cesiumkitPollers) {"
+            f"const timer = window.__cesiumkitPollers.get({poller_id_js});"
+            "if (timer !== undefined) clearInterval(timer);"
+            f"window.__cesiumkitPollers.delete({poller_id_js});"
+            "}"
+        )
+
+    def stream_czml(
+        self,
+        packets: Iterable[list[dict[str, Any]]],
+        *,
+        interval: float = 1.0,
+    ) -> threading.Thread:
+        """Consume CZML packet batches in a daemon thread and queue live updates."""
+        if not math.isfinite(interval) or interval <= 0:
+            raise ValueError("interval must be a positive finite number")
+
+        def stream() -> None:
+            for batch in packets:
+                self.update_czml(batch)
+                time.sleep(interval)
+
+        thread = threading.Thread(target=stream, name="cesiumkit-czml-stream", daemon=True)
+        thread.start()
+        return thread
 
     # --- Serialization helpers ---
 

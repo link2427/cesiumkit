@@ -18,3 +18,19 @@ current_time = viewer.get_current_time()
 
 `show()` blocks while serving. Run it in a background thread when the same
 Python process needs to issue runtime commands.
+
+## Live data sources
+
+CZML and GeoJSON sources can be replaced without rebuilding the viewer. Values
+may be URLs or in-memory JSON-compatible data:
+
+```python
+viewer.update_czml([{"id": "document", "version": "1.0"}, packet])
+viewer.update_geojson({"type": "FeatureCollection", "features": []})
+
+poller = viewer.poll_czml("https://example.com/live.czml", interval=5)
+viewer.stop_polling(poller)
+```
+
+For Python-produced updates, `stream_czml()` consumes an iterable of CZML
+packet batches in a daemon thread.

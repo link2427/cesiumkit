@@ -157,6 +157,48 @@ class TestViewer:
     def test_runtime_queue_uses_deque(self):
         assert isinstance(cesiumkit.Viewer()._command_queue, deque)
 
+    def test_update_czml_accepts_packets_and_targets_matching_source(self):
+        v = cesiumkit.Viewer()
+        packets = [{"id": "document", "version": "1.0"}, {"id": "sat-1"}]
+        v.update_czml(packets)
+        command = v._command_queue[-1]["js"]
+        assert '"sat-1"' in command
+        assert "candidate instanceof Cesium.CzmlDataSource" in command
+        assert "collection.get(0)" not in command
+
+    def test_update_geojson_escapes_urls(self):
+        v = cesiumkit.Viewer()
+        v.update_geojson("https://example.com/o'hare.geojson")
+        command = v._command_queue[-1]["js"]
+        assert '"https://example.com/o\'hare.geojson"' in command
+        assert "Cesium.GeoJsonDataSource.load" in command
+
+    def test_poll_czml_can_be_stopped(self):
+        v = cesiumkit.Viewer()
+        poller_id = v.poll_czml("https://example.com/live.czml", interval=2.5)
+        assert poller_id
+        assert "setInterval" in v._command_queue[-1]["js"]
+        assert "2500.0" in v._command_queue[-1]["js"]
+        v.stop_polling(poller_id)
+        assert poller_id in v._command_queue[-1]["js"]
+        assert "clearInterval" in v._command_queue[-1]["js"]
+
+    def test_runtime_update_interval_validation(self):
+        v = cesiumkit.Viewer()
+        with pytest.raises(ValueError, match="positive"):
+            v.poll_czml("https://example.com/live.czml", interval=0)
+        with pytest.raises(ValueError, match="positive"):
+            v.stream_czml([], interval=float("inf"))
+
+    def test_stream_czml_queues_each_batch(self):
+        v = cesiumkit.Viewer()
+        thread = v.stream_czml([[{"id": "one"}], [{"id": "two"}]], interval=0.001)
+        thread.join(timeout=1)
+        assert not thread.is_alive()
+        commands = [command["js"] for command in v._command_queue]
+        assert any('"one"' in command for command in commands)
+        assert any('"two"' in command for command in commands)
+
 
 class TestViewerCzmlExport:
     def test_basic_czml_export(self):

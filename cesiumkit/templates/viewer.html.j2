@@ -103,19 +103,38 @@
         {{ custom_js }}
         {% endfor %}
 
-        // ── Runtime command polling (cesiumkit >={{ cesium_version }}) ──
+        // ── Runtime command bridge ──
+        async function __cesiumkitPostResult(requestId, result, error) {
+            const response = await fetch('/__cesiumkit_result', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({requestId, result, error}),
+            });
+            if (!response.ok) throw new Error('Failed to return runtime command result');
+        }
+
         let _cesiumkitCmdSeq = 0;
-        setInterval(async () => {
+        async function _cesiumkitPollCommands() {
             try {
                 const resp = await fetch('/__cesiumkit_cmd?seq=' + _cesiumkitCmdSeq);
                 if (!resp.ok) return;
                 const cmd = await resp.json();
                 if (cmd.js) {
-                    eval(cmd.js);
-                    _cesiumkitCmdSeq = cmd.seq;
+                    try {
+                        eval(cmd.js);
+                    } catch (error) {
+                        console.error('cesiumkit runtime command failed:', error);
+                    } finally {
+                        _cesiumkitCmdSeq = cmd.seq;
+                    }
                 }
-            } catch (_) { /* server not ready yet — ignore */ }
-        }, 500);
+            } catch (_) {
+                // The static HTML export has no runtime server.
+            } finally {
+                setTimeout(_cesiumkitPollCommands, 250);
+            }
+        }
+        _cesiumkitPollCommands();
     </script>
 </body>
 </html>

@@ -34,3 +34,16 @@ viewer.stop_polling(poller)
 
 For Python-produced updates, `stream_czml()` consumes an iterable of CZML
 packet batches in a daemon thread.
+
+## Runtime selection and picking
+
+Selection commands operate on entities already added to the viewer. Picking
+returns the corresponding local Python `Entity` when its ID is known:
+
+```python
+viewer.select_entity("sat-1")
+selected = viewer.selected_entity
+picked = viewer.pick(cesiumkit.Cartesian2(x=100, y=200))
+all_picked = viewer.drill_pick(cesiumkit.Cartesian2(x=100, y=200))
+viewer.deselect()
+```

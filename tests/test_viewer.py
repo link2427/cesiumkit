@@ -199,6 +199,40 @@ class TestViewer:
         assert any('"one"' in command for command in commands)
         assert any('"two"' in command for command in commands)
 
+    def test_select_entity_escapes_id(self):
+        v = cesiumkit.Viewer()
+        v.select_entity("sat'1")
+        command = v._command_queue[-1]["js"]
+        assert 'getById("sat\'1")' in command
+        assert "requestRender" in command
+
+    def test_pick_returns_local_entity(self, monkeypatch):
+        v = cesiumkit.Viewer()
+        entity = v.add_entity(cesiumkit.Entity(id="sat-1"))
+        monkeypatch.setattr(v, "_request_runtime_result", lambda expression, *, timeout: "sat-1")
+        assert v.pick(cesiumkit.Cartesian2(x=10, y=20)) is entity
+
+    def test_pick_validates_screen_position(self):
+        v = cesiumkit.Viewer()
+        with pytest.raises(ValueError, match="finite"):
+            v.pick(cesiumkit.Cartesian2(x=float("inf"), y=20))
+
+    def test_selected_entity_returns_local_entity(self, monkeypatch):
+        v = cesiumkit.Viewer()
+        entity = v.add_entity(cesiumkit.Entity(id="selected"))
+        monkeypatch.setattr(v, "_get_selected_entity_id", lambda: "selected")
+        assert v.selected_entity is entity
+
+    def test_drill_pick_filters_nonlocal_entities(self, monkeypatch):
+        v = cesiumkit.Viewer()
+        local = v.add_entity(cesiumkit.Entity(id="local"))
+        monkeypatch.setattr(
+            v,
+            "_request_runtime_result",
+            lambda expression, *, timeout: ["local", "external"],
+        )
+        assert v.drill_pick(cesiumkit.Cartesian2(x=1, y=2)) == [local]
+
 
 class TestViewerCzmlExport:
     def test_basic_czml_export(self):

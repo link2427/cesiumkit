@@ -10,7 +10,7 @@ import time
 import webbrowser
 from collections import deque
 from collections.abc import Iterable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from cesiumkit._html import HtmlDocument
@@ -19,6 +19,10 @@ from cesiumkit.czml import CzmlDocument
 from cesiumkit.enums import SceneMode, ScreenSpaceEventType
 from cesiumkit.events import EventHandler
 from cesiumkit.utils import JsCode
+
+if TYPE_CHECKING:
+    from cesiumkit.coordinates import Cartesian2
+    from cesiumkit.entities._base import Entity
 
 
 class Viewer:
@@ -350,6 +354,75 @@ class Viewer:
         if not isinstance(result, str):
             raise RuntimeError("Browser returned a non-string clock value")
         return result
+
+    # --- Entity picking and selection ---
+
+    def select_entity(self, entity_id: str) -> None:
+        """Select a viewer entity by ID."""
+        entity_id_js = json.dumps(entity_id)
+        self._send_command(
+            f"const entity = viewer.entities.getById({entity_id_js});"
+            "if (entity) { viewer.selectedEntity = entity; viewer.scene.requestRender(); }"
+        )
+
+    def deselect(self) -> None:
+        """Clear the live viewer selection."""
+        self._send_command("viewer.selectedEntity = undefined; viewer.scene.requestRender();")
+
+    def _get_selected_entity_id(self, *, timeout: float = 10.0) -> str | None:
+        """Return the selected Cesium entity ID."""
+        result = self._request_runtime_result(
+            "viewer.selectedEntity ? viewer.selectedEntity.id : null",
+            timeout=timeout,
+        )
+        if result is not None and not isinstance(result, str):
+            raise RuntimeError("Browser returned an invalid selected entity ID")
+        return result
+
+    @property
+    def selected_entity(self) -> Entity | None:
+        """Return the selected local entity, or ``None`` if it is not local."""
+        entity_id = self._get_selected_entity_id()
+        return self.entities.get_by_id(entity_id) if entity_id is not None else None
+
+    @staticmethod
+    def _screen_position_js(position: Cartesian2) -> str:
+        """Serialize and validate a screen-space position."""
+        if not math.isfinite(position.x) or not math.isfinite(position.y):
+            raise ValueError("screen position coordinates must be finite")
+        return f"new Cesium.Cartesian2({position.x}, {position.y})"
+
+    def pick(self, position: Cartesian2, *, timeout: float = 10.0) -> Entity | None:
+        """Return the local entity at a screen position."""
+        position_js = self._screen_position_js(position)
+        entity_id = self._request_runtime_result(
+            "(() => {"
+            f"const picked = viewer.scene.pick({position_js});"
+            "return picked && picked.id ? picked.id.id : null;"
+            "})()",
+            timeout=timeout,
+        )
+        if entity_id is None:
+            return None
+        if not isinstance(entity_id, str):
+            raise RuntimeError("Browser returned an invalid picked entity ID")
+        return self.entities.get_by_id(entity_id)
+
+    def drill_pick(self, position: Cartesian2, *, timeout: float = 10.0) -> list[Entity]:
+        """Return all local entities at a screen position."""
+        position_js = self._screen_position_js(position)
+        entity_ids = self._request_runtime_result(
+            "(() => {"
+            f"const picked = viewer.scene.drillPick({position_js});"
+            "return picked.map((item) => item && item.id ? item.id.id : null)"
+            ".filter((id) => typeof id === 'string');"
+            "})()",
+            timeout=timeout,
+        )
+        if not isinstance(entity_ids, list) or not all(isinstance(item, str) for item in entity_ids):
+            raise RuntimeError("Browser returned invalid drill-pick entity IDs")
+        entities = [self.entities.get_by_id(entity_id) for entity_id in entity_ids]
+        return [entity for entity in entities if entity is not None]
 
     # --- Runtime data source updates ---
 

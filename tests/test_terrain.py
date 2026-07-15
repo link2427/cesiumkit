@@ -1,9 +1,14 @@
 """Tests for cesiumkit.terrain module."""
 
+import pytest
+from pydantic import ValidationError
+
 from cesiumkit.terrain import (
     CesiumTerrainProvider,
     EllipsoidTerrainProvider,
     IonTerrainProvider,
+    WmsTerrainProvider,
+    WmtsTerrainProvider,
 )
 
 
@@ -32,3 +37,53 @@ class TestIonTerrainProvider:
         assert "createWorldTerrainAsync" in js
         assert "requestVertexNormals" in js
         assert "requestWaterMask" in js
+
+
+class TestWmsTerrainProvider:
+    def test_uses_real_custom_heightmap_provider(self):
+        provider = WmsTerrainProvider(
+            url="https://terrain.example.com/wms?token=o'hare",
+            layers="elevation",
+        )
+        js = provider.to_js()
+        assert "new Cesium.CustomHeightmapTerrainProvider" in js
+        assert "WebMapServiceTerrainProvider" not in js
+        assert '"https://terrain.example.com/wms?token=o\'hare"' in js
+        assert "tileXYToRectangle" in js
+        assert "GetMap" in js
+        assert "Float32Array" in js
+        assert "-10000.0" in js
+
+    def test_wms_130_uses_latitude_longitude_axis_order(self):
+        js = WmsTerrainProvider(
+            url="https://terrain.example.com/wms",
+            layers="elevation",
+            version="1.3.0",
+        ).to_js()
+        assert "[south, west, north, east]" in js
+        assert "searchParams.set('crs', \"EPSG:4326\")" in js
+
+    def test_validates_levels(self):
+        with pytest.raises(ValidationError, match="maximum_level"):
+            WmsTerrainProvider(
+                url="https://terrain.example.com/wms",
+                layers="elevation",
+                minimum_level=5,
+                maximum_level=4,
+            )
+
+
+class TestWmtsTerrainProvider:
+    def test_builds_wmts_heightmap_callback(self):
+        provider = WmtsTerrainProvider(
+            url="https://terrain.example.com/wmts",
+            layer="elevation",
+            tile_matrix_set="WebMercatorQuad",
+            encoding="terrarium",
+        )
+        js = provider.to_js()
+        assert "new Cesium.CustomHeightmapTerrainProvider" in js
+        assert "new Cesium.WebMercatorTilingScheme" in js
+        assert "GetTile" in js
+        assert "tilematrixset" in js
+        assert "32768.0" in js

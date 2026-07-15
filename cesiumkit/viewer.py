@@ -2,10 +2,21 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
+import math
 import tempfile
+import threading
+import time
 import webbrowser
-from typing import Any
+from collections import deque
+from collections.abc import Iterable
+from io import BytesIO
+from os import PathLike
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+from uuid import uuid4
 
 from cesiumkit._html import HtmlDocument
 from cesiumkit._js_serializer import camelize, to_js_value
@@ -13,6 +24,12 @@ from cesiumkit.czml import CzmlDocument
 from cesiumkit.enums import SceneMode, ScreenSpaceEventType
 from cesiumkit.events import EventHandler
 from cesiumkit.utils import JsCode
+
+if TYPE_CHECKING:
+    from PIL.Image import Image as PILImage
+
+    from cesiumkit.coordinates import Cartesian2
+    from cesiumkit.entities._base import Entity
 
 
 class Viewer:
@@ -47,6 +64,11 @@ class Viewer:
         timeline: bool | None = None,
         navigation_help_button: bool | None = None,
         navigation_instructions_initially_visible: bool | None = None,
+        request_render_mode: bool | None = None,
+        maximum_render_time_change: float | None = None,
+        resolution_scale: float | None = None,
+        target_frame_rate: int | None = None,
+        show_renderer_errors: bool | None = None,
         # Scene
         scene_mode: SceneMode | None = None,
         scene: Any = None,  # SceneConfig
@@ -92,6 +114,10 @@ class Viewer:
             "navigation_help_button": navigation_help_button,
             "navigation_instructions_initially_visible": navigation_instructions_initially_visible,
             "should_animate": should_animate,
+            "request_render_mode": request_render_mode,
+            "maximum_render_time_change": maximum_render_time_change,
+            "target_frame_rate": target_frame_rate,
+            "show_render_loop_errors": show_renderer_errors,
         }
         for key, val in opt_map.items():
             if val is not None:
@@ -103,6 +129,16 @@ class Viewer:
             self._viewer_options["terrain_provider"] = terrain_provider
         if imagery_provider is not None:
             self._viewer_options["imagery_provider"] = imagery_provider
+
+        if maximum_render_time_change is not None and (
+            not math.isfinite(maximum_render_time_change) or maximum_render_time_change < 0
+        ):
+            raise ValueError("maximum_render_time_change must be finite and non-negative")
+        if resolution_scale is not None and (not math.isfinite(resolution_scale) or resolution_scale <= 0):
+            raise ValueError("resolution_scale must be a positive finite number")
+        if target_frame_rate is not None and target_frame_rate <= 0:
+            raise ValueError("target_frame_rate must be positive")
+        self._resolution_scale = resolution_scale
 
         # Scene/Globe/Clock config (applied post-construction)
         self.scene_config = scene
@@ -125,11 +161,49 @@ class Viewer:
         self._event_handlers: list[EventHandler] = []
         self._custom_scripts: list[str] = []
 
+        # Runtime command queue (for live viewer control)
+        self._command_seq = 0
+        self._command_queue: deque[dict[str, Any]] = deque()
+        self._runtime_results: dict[str, Any] = {}
+        self._runtime_errors: dict[str, str] = {}
+        self._runtime_condition = threading.Condition()
+        self._server: Any = None
+
     # --- Entity convenience methods ---
 
     def add_entity(self, entity: Any = None, **kwargs: Any) -> Any:
         """Add an entity. Can pass an Entity instance or keyword args."""
         return self.entities.add(entity, **kwargs)
+
+    def remove_entity(self, entity: Any) -> bool:
+        """Remove an entity from the viewer.
+
+        Returns True if the entity was found and removed.
+        """
+        return self.entities.remove(entity)
+
+    def remove_entity_by_id(self, entity_id: str) -> bool:
+        """Remove an entity by its ID.
+
+        Returns True if the entity was found and removed.
+        """
+        entity = self.entities.get_by_id(entity_id)
+        if entity is not None:
+            return self.entities.remove(entity)
+        return False
+
+    def clear_entities(self) -> None:
+        """Remove all entities from the viewer."""
+        self.entities.remove_all()
+
+    def get_entity(self, entity_id: str) -> Any | None:
+        """Get an entity by its ID, or None if not found."""
+        return self.entities.get_by_id(entity_id)
+
+    @property
+    def entity_count(self) -> int:
+        """Number of entities currently in the viewer."""
+        return len(self.entities)
 
     def add_geodataframe(self, gdf: Any, **options: Any) -> list[Any]:
         """Add all features from a ``geopandas.GeoDataFrame`` to this Viewer.
@@ -228,6 +302,289 @@ class Viewer:
         """Point the camera at a target."""
         self.camera.look_at(target, offset)
 
+    # --- Runtime clock control ---
+
+    def _send_command(self, js: str) -> int:
+        """Queue a JS command for the live viewer to execute."""
+        with self._runtime_condition:
+            self._command_seq += 1
+            self._command_queue.append({"seq": self._command_seq, "js": js})
+            self._runtime_condition.notify_all()
+            return self._command_seq
+
+    def _request_runtime_result(self, expression: str, *, timeout: float) -> Any:
+        """Evaluate a JavaScript expression and wait for its JSON result."""
+        if self._server is None:
+            raise RuntimeError("The viewer must be running via show() before reading browser state")
+
+        request_id = uuid4().hex
+        request_id_js = json.dumps(request_id)
+        self._send_command(
+            "(async () => {"
+            "try {"
+            f"const value = ({expression});"
+            f"await __cesiumkitPostResult({request_id_js}, value, null);"
+            "} catch (error) {"
+            f"await __cesiumkitPostResult({request_id_js}, null, String(error));"
+            "}"
+            "})();"
+        )
+        return self._wait_for_runtime_result(request_id, timeout=timeout)
+
+    def _wait_for_runtime_result(self, request_id: str, *, timeout: float) -> Any:
+        """Wait for a result posted by the browser runtime bridge."""
+        with self._runtime_condition:
+            ready = self._runtime_condition.wait_for(
+                lambda: request_id in self._runtime_results or request_id in self._runtime_errors,
+                timeout=timeout,
+            )
+            if not ready:
+                raise TimeoutError(f"Browser response timed out after {timeout:g}s")
+            if request_id in self._runtime_errors:
+                message = self._runtime_errors.pop(request_id)
+                raise RuntimeError(f"Browser command failed: {message}")
+            return self._runtime_results.pop(request_id)
+
+    def set_time(self, iso_string: str) -> None:
+        """Jump the timeline to a specific ISO 8601 epoch and update the widget.
+
+        Example: ``viewer.set_time(\"2024-03-15T03:00:00Z\")``
+        """
+        iso_js = json.dumps(iso_string)
+        self._send_command(f"viewer.clock.currentTime = Cesium.JulianDate.fromIso8601({iso_js});")
+        self._send_command("if (viewer.timeline) viewer.timeline.updateFromClock();")
+
+    def animate(self, on: bool = True) -> None:
+        """Start or stop clock playback.
+
+        Example: ``viewer.animate(on=False)`` to pause.
+        """
+        val = "true" if on else "false"
+        self._send_command(f"viewer.clock.shouldAnimate = {val};")
+
+    def set_multiplier(self, multiplier: float) -> None:
+        """Change the clock playback speed.
+
+        Example: ``viewer.set_multiplier(3600)`` for 1 hour per second.
+        """
+        if not math.isfinite(multiplier):
+            raise ValueError("multiplier must be finite")
+        self._send_command(f"viewer.clock.multiplier = {multiplier};")
+
+    def get_current_time(self, *, timeout: float = 10.0) -> str:
+        """Return the live viewer clock as an ISO 8601 string."""
+        result = self._request_runtime_result(
+            "Cesium.JulianDate.toIso8601(viewer.clock.currentTime)",
+            timeout=timeout,
+        )
+        if not isinstance(result, str):
+            raise RuntimeError("Browser returned a non-string clock value")
+        return result
+
+    # --- Screenshot export ---
+
+    def screenshot_base64(self, *, timeout: float = 10.0) -> str:
+        """Return a PNG screenshot of the live viewer as base64 text."""
+        result = self._request_runtime_result(
+            "(() => {"
+            "viewer.scene.requestRender();"
+            "viewer.scene.render();"
+            "return viewer.scene.canvas.toDataURL('image/png').split(',')[1];"
+            "})()",
+            timeout=timeout,
+        )
+        if not isinstance(result, str):
+            raise RuntimeError("Browser returned an invalid screenshot payload")
+        return result
+
+    def _screenshot_bytes(self, *, timeout: float) -> bytes:
+        """Decode a live screenshot and validate its base64 payload."""
+        try:
+            return base64.b64decode(self.screenshot_base64(timeout=timeout), validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise RuntimeError("Browser returned malformed screenshot data") from exc
+
+    def screenshot(self, path: str | PathLike[str], *, timeout: float = 10.0) -> None:
+        """Save a PNG screenshot of the live viewer."""
+        Path(path).write_bytes(self._screenshot_bytes(timeout=timeout))
+
+    def canvas_to_image(self, *, timeout: float = 10.0) -> PILImage:
+        """Return a screenshot as a detached Pillow image.
+
+        Install the optional ``images`` extra to use this method.
+        """
+        try:
+            from PIL import Image
+        except ImportError as exc:  # pragma: no cover - depends on optional installation
+            raise ImportError("canvas_to_image() requires `pip install cesiumkit[images]`") from exc
+
+        with Image.open(BytesIO(self._screenshot_bytes(timeout=timeout))) as image:
+            return image.copy()
+
+    # --- Entity picking and selection ---
+
+    def select_entity(self, entity_id: str) -> None:
+        """Select a viewer entity by ID."""
+        entity_id_js = json.dumps(entity_id)
+        self._send_command(
+            f"const entity = viewer.entities.getById({entity_id_js});"
+            "if (entity) { viewer.selectedEntity = entity; viewer.scene.requestRender(); }"
+        )
+
+    def deselect(self) -> None:
+        """Clear the live viewer selection."""
+        self._send_command("viewer.selectedEntity = undefined; viewer.scene.requestRender();")
+
+    def _get_selected_entity_id(self, *, timeout: float = 10.0) -> str | None:
+        """Return the selected Cesium entity ID."""
+        result = self._request_runtime_result(
+            "viewer.selectedEntity ? viewer.selectedEntity.id : null",
+            timeout=timeout,
+        )
+        if result is not None and not isinstance(result, str):
+            raise RuntimeError("Browser returned an invalid selected entity ID")
+        return result
+
+    @property
+    def selected_entity(self) -> Entity | None:
+        """Return the selected local entity, or ``None`` if it is not local."""
+        entity_id = self._get_selected_entity_id()
+        return self.entities.get_by_id(entity_id) if entity_id is not None else None
+
+    @staticmethod
+    def _screen_position_js(position: Cartesian2) -> str:
+        """Serialize and validate a screen-space position."""
+        if not math.isfinite(position.x) or not math.isfinite(position.y):
+            raise ValueError("screen position coordinates must be finite")
+        return f"new Cesium.Cartesian2({position.x}, {position.y})"
+
+    def pick(self, position: Cartesian2, *, timeout: float = 10.0) -> Entity | None:
+        """Return the local entity at a screen position."""
+        position_js = self._screen_position_js(position)
+        entity_id = self._request_runtime_result(
+            "(() => {"
+            f"const picked = viewer.scene.pick({position_js});"
+            "return picked && picked.id ? picked.id.id : null;"
+            "})()",
+            timeout=timeout,
+        )
+        if entity_id is None:
+            return None
+        if not isinstance(entity_id, str):
+            raise RuntimeError("Browser returned an invalid picked entity ID")
+        return self.entities.get_by_id(entity_id)
+
+    def drill_pick(self, position: Cartesian2, *, timeout: float = 10.0) -> list[Entity]:
+        """Return all local entities at a screen position."""
+        position_js = self._screen_position_js(position)
+        entity_ids = self._request_runtime_result(
+            "(() => {"
+            f"const picked = viewer.scene.drillPick({position_js});"
+            "return picked.map((item) => item && item.id ? item.id.id : null)"
+            ".filter((id) => typeof id === 'string');"
+            "})()",
+            timeout=timeout,
+        )
+        if not isinstance(entity_ids, list) or not all(isinstance(item, str) for item in entity_ids):
+            raise RuntimeError("Browser returned invalid drill-pick entity IDs")
+        entities = [self.entities.get_by_id(entity_id) for entity_id in entity_ids]
+        return [entity for entity in entities if entity is not None]
+
+    # --- Runtime data source updates ---
+
+    @staticmethod
+    def _data_source_update_js(source: Any, cesium_class: str) -> str:
+        """Build an async command that replaces the first matching data source."""
+        source_js = json.dumps(source)
+        return (
+            "(async () => {"
+            f"const replacement = await Cesium.{cesium_class}.load({source_js});"
+            "const collection = viewer.dataSources;"
+            "let existing;"
+            "for (let index = 0; index < collection.length; index += 1) {"
+            "const candidate = collection.get(index);"
+            f"if (candidate instanceof Cesium.{cesium_class}) {{ existing = candidate; break; }}"
+            "}"
+            "if (existing) collection.remove(existing, true);"
+            "await collection.add(replacement);"
+            "viewer.scene.requestRender();"
+            "})();"
+        )
+
+    def update_czml(self, source: str | list[dict[str, Any]]) -> None:
+        """Replace the first live CZML data source from a URL or CZML packets."""
+        self._send_command(self._data_source_update_js(source, "CzmlDataSource"))
+
+    def update_geojson(self, source: str | dict[str, Any]) -> None:
+        """Replace the first live GeoJSON data source from a URL or mapping."""
+        self._send_command(self._data_source_update_js(source, "GeoJsonDataSource"))
+
+    def poll_czml(self, url: str, *, interval: float = 5.0) -> str:
+        """Refresh CZML from *url* in the browser at a fixed interval.
+
+        Returns an identifier that can be passed to :meth:`stop_polling`.
+        """
+        if not math.isfinite(interval) or interval <= 0:
+            raise ValueError("interval must be a positive finite number")
+
+        poller_id = uuid4().hex
+        poller_id_js = json.dumps(poller_id)
+        url_js = json.dumps(url)
+        interval_ms = interval * 1000
+        self._send_command(
+            "(async () => {"
+            "window.__cesiumkitPollers ??= new Map();"
+            f"const pollerId = {poller_id_js};"
+            f"const source = {url_js};"
+            "const refresh = async () => {"
+            "const replacement = await Cesium.CzmlDataSource.load(source);"
+            "const collection = viewer.dataSources;"
+            "let existing;"
+            "for (let index = 0; index < collection.length; index += 1) {"
+            "const candidate = collection.get(index);"
+            "if (candidate instanceof Cesium.CzmlDataSource) { existing = candidate; break; }"
+            "}"
+            "if (existing) collection.remove(existing, true);"
+            "await collection.add(replacement);"
+            "viewer.scene.requestRender();"
+            "};"
+            "await refresh();"
+            f"const timer = setInterval(() => refresh().catch(console.error), {interval_ms});"
+            "window.__cesiumkitPollers.set(pollerId, timer);"
+            "})();"
+        )
+        return poller_id
+
+    def stop_polling(self, poller_id: str) -> None:
+        """Stop a browser-side data-source poller."""
+        poller_id_js = json.dumps(poller_id)
+        self._send_command(
+            "if (window.__cesiumkitPollers) {"
+            f"const timer = window.__cesiumkitPollers.get({poller_id_js});"
+            "if (timer !== undefined) clearInterval(timer);"
+            f"window.__cesiumkitPollers.delete({poller_id_js});"
+            "}"
+        )
+
+    def stream_czml(
+        self,
+        packets: Iterable[list[dict[str, Any]]],
+        *,
+        interval: float = 1.0,
+    ) -> threading.Thread:
+        """Consume CZML packet batches in a daemon thread and queue live updates."""
+        if not math.isfinite(interval) or interval <= 0:
+            raise ValueError("interval must be a positive finite number")
+
+        def stream() -> None:
+            for batch in packets:
+                self.update_czml(batch)
+                time.sleep(interval)
+
+        thread = threading.Thread(target=stream, name="cesiumkit-czml-stream", daemon=True)
+        thread.start()
+        return thread
+
     # --- Serialization helpers ---
 
     def _build_viewer_options_js(self) -> str:
@@ -271,9 +628,12 @@ class Viewer:
 
     def _build_scene_statements(self) -> list[str]:
         """Build JS statements for scene configuration."""
+        statements: list[str] = []
+        if self._resolution_scale is not None:
+            statements.append(f"viewer.resolutionScale = {self._resolution_scale};")
         if self.scene_config and hasattr(self.scene_config, "to_js_statements"):
-            return self.scene_config.to_js_statements("viewer")
-        return []
+            statements.extend(self.scene_config.to_js_statements("viewer"))
+        return statements
 
     def _build_globe_statements(self) -> list[str]:
         """Build JS statements for globe configuration."""
@@ -321,14 +681,16 @@ class Viewer:
         """Launch a local HTTP server and open the visualization in a browser.
 
         Cesium requires HTTP (not file://) due to web worker CORS restrictions.
-        The server runs in a background thread and shuts down on KeyboardInterrupt.
+        The server runs until interrupted. Call ``show()`` from a background
+        thread when other Python code needs to control the live viewer.
 
         Args:
             port: Port to serve on. 0 = auto-pick a free port.
             open_browser: Whether to automatically open the browser.
         """
         import os
-        from http.server import HTTPServer, SimpleHTTPRequestHandler
+        from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+        from urllib.parse import parse_qs, urlparse
 
         tmpdir = tempfile.mkdtemp(prefix="cesiumkit_")
         html_path = os.path.join(tmpdir, "index.html")
@@ -339,10 +701,80 @@ class Viewer:
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, directory=tmpdir, **kwargs)
 
+            def do_GET(self):
+                if self.path.startswith("/__cesiumkit_cmd"):
+                    self._handle_command_poll()
+                    return
+                super().do_GET()
+
+            def do_POST(self):
+                if self.path == "/__cesiumkit_result":
+                    self._handle_runtime_result()
+                    return
+                self.send_error(405)
+
+            def _handle_command_poll(self):
+                parsed = urlparse(self.path)
+                params = parse_qs(parsed.query)
+                try:
+                    client_seq = int(params.get("seq", [0])[0])
+                except (TypeError, ValueError):
+                    self.send_error(400, "Invalid command sequence")
+                    return
+
+                with self._viewer._runtime_condition:
+                    while self._viewer._command_queue and self._viewer._command_queue[0]["seq"] <= client_seq:
+                        self._viewer._command_queue.popleft()
+                    cmd = self._viewer._command_queue[0] if self._viewer._command_queue else None
+
+                body = json.dumps(cmd or {}).encode("utf-8")
+
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def _handle_runtime_result(self):
+                try:
+                    content_length = int(self.headers.get("Content-Length", "0"))
+                except ValueError:
+                    self.send_error(400, "Invalid content length")
+                    return
+                if content_length <= 0 or content_length > 100 * 1024 * 1024:
+                    self.send_error(413, "Invalid result payload size")
+                    return
+
+                try:
+                    data = json.loads(self.rfile.read(content_length))
+                    request_id = data["requestId"]
+                    if not isinstance(request_id, str):
+                        raise TypeError
+                except (json.JSONDecodeError, KeyError, TypeError):
+                    self.send_error(400, "Invalid result payload")
+                    return
+
+                with self._viewer._runtime_condition:
+                    if data.get("error") is not None:
+                        self._viewer._runtime_errors[request_id] = str(data["error"])
+                    else:
+                        self._viewer._runtime_results[request_id] = data.get("result")
+                    self._viewer._runtime_condition.notify_all()
+
+                body = b'{"ok":true}'
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
             def log_message(self, format, *args):
                 pass  # Suppress request logs
 
-        server = HTTPServer(("127.0.0.1", port), Handler)
+        Handler._viewer = self  # Attach viewer for command queue access
+
+        server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+        self._server = server
         actual_port = server.server_address[1]
         url = f"http://127.0.0.1:{actual_port}/index.html"
 
@@ -357,6 +789,7 @@ class Viewer:
             print("\nServer stopped.")
         finally:
             server.server_close()
+            self._server = None
 
     def show_in_browser(self) -> None:
         """Alias for show(). Opens visualization via local HTTP server."""

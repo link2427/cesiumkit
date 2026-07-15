@@ -135,7 +135,13 @@ from cesiumkit.properties import (
 )
 
 # Scene & Globe
-from cesiumkit.scene import SceneConfig
+from cesiumkit.scene import (
+    AmbientOcclusionConfig,
+    BloomConfig,
+    FXAAConfig,
+    PostProcessConfig,
+    SceneConfig,
+)
 
 # Terrain Providers
 from cesiumkit.terrain import (
@@ -143,6 +149,8 @@ from cesiumkit.terrain import (
     EllipsoidTerrainProvider,
     IonTerrainProvider,
     TerrainProvider,
+    WmsTerrainProvider,
+    WmtsTerrainProvider,
 )
 
 # Viewer — the main entry point
@@ -261,12 +269,18 @@ __all__ = [
     "EllipsoidTerrainProvider",
     "CesiumTerrainProvider",
     "IonTerrainProvider",
+    "WmsTerrainProvider",
+    "WmtsTerrainProvider",
     # Camera
     "Camera",
     "CameraPosition",
     "FlyToOptions",
     "LookAtOptions",
     # Scene & Globe
+    "AmbientOcclusionConfig",
+    "BloomConfig",
+    "FXAAConfig",
+    "PostProcessConfig",
     "SceneConfig",
     "GlobeConfig",
     # Ion

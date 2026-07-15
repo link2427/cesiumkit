@@ -1,5 +1,8 @@
 """Integration tests for full HTML output."""
 
+import pytest
+from pydantic import ValidationError
+
 import cesiumkit
 
 
@@ -107,6 +110,24 @@ class TestFullHtmlOutput:
         assert "enableLighting = true" in html
         assert "depthTestAgainstTerrain = true" in html
 
+    def test_scene_with_terrain_exaggeration(self):
+        viewer = cesiumkit.Viewer(
+            globe=cesiumkit.GlobeConfig(
+                terrain_exaggeration=3.0,
+                terrain_exaggeration_relative_height=100.0,
+            )
+        )
+        html = viewer.to_html()
+        assert "scene.verticalExaggeration = 3.0" in html
+        assert "scene.verticalExaggerationRelativeHeight = 100.0" in html
+        assert "globe.terrainExaggeration" not in html
+
+    def test_terrain_exaggeration_validation(self):
+        with pytest.raises(ValidationError):
+            cesiumkit.GlobeConfig(terrain_exaggeration=-1)
+        with pytest.raises(ValidationError):
+            cesiumkit.GlobeConfig(terrain_exaggeration_relative_height=float("inf"))
+
     def test_scene_with_scene_config(self):
         viewer = cesiumkit.Viewer(
             scene=cesiumkit.SceneConfig(
@@ -117,6 +138,50 @@ class TestFullHtmlOutput:
         html = viewer.to_html()
         assert "skyBox.show = false" in html
         assert "fog.enabled = false" in html
+
+    def test_scene_config_render_mode(self):
+        viewer = cesiumkit.Viewer(
+            scene=cesiumkit.SceneConfig(
+                request_render_mode=True,
+                maximum_render_time_change=1.5,
+            )
+        )
+        html = viewer.to_html()
+        assert "scene.requestRenderMode = true" in html
+        assert "scene.maximumRenderTimeChange = 1.5" in html
+
+    def test_post_process_configuration(self):
+        viewer = cesiumkit.Viewer(
+            scene=cesiumkit.SceneConfig(
+                post_process=cesiumkit.PostProcessConfig(
+                    bloom=cesiumkit.BloomConfig(enabled=True, contrast=100, step_size=4),
+                    fxaa=cesiumkit.FXAAConfig(enabled=False),
+                    ambient_occlusion=cesiumkit.AmbientOcclusionConfig(enabled=True, intensity=2),
+                )
+            )
+        )
+        html = viewer.to_html()
+        assert "postProcessStages.bloom.enabled = true" in html
+        assert "postProcessStages.bloom.uniforms.contrast = 100.0" in html
+        assert "postProcessStages.bloom.uniforms.stepSize = 4.0" in html
+        assert "postProcessStages.fxaa.enabled = false" in html
+        assert "postProcessStages.ambientOcclusion.uniforms.intensity = 2.0" in html
+
+    def test_disabled_post_process_does_not_write_uniforms(self):
+        statements = cesiumkit.PostProcessConfig(
+            bloom=cesiumkit.BloomConfig(enabled=False),
+            ambient_occlusion=cesiumkit.AmbientOcclusionConfig(enabled=False),
+        ).to_js_statements()
+        assert statements == [
+            "viewer.scene.postProcessStages.bloom.enabled = false;",
+            "viewer.scene.postProcessStages.ambientOcclusion.enabled = false;",
+        ]
+
+    def test_post_process_validation(self):
+        with pytest.raises(ValidationError):
+            cesiumkit.BloomConfig(contrast=300)
+        with pytest.raises(ValidationError):
+            cesiumkit.AmbientOcclusionConfig(step_size=0)
 
     def test_time_dynamic_entity(self):
         pos = cesiumkit.SampledPositionProperty()

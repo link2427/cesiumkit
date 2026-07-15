@@ -160,7 +160,7 @@ viewer.save_czml("output.czml")
 
 ### Imagery and terrain providers
 
-8 imagery providers (Bing, OpenStreetMap, Mapbox, WMTS, WMS, URL template, Ion, TileMapService) and 3 terrain providers (Cesium Ion world terrain, Cesium Ion asset, ellipsoid).
+8 imagery providers (Bing, OpenStreetMap, Mapbox, WMTS, WMS, URL template, Ion, TileMapService) and terrain providers for Cesium Ion, ellipsoid, and encoded WMS/WMTS heightmaps.
 
 ### Cesium Ion integration
 

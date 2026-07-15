@@ -18,7 +18,8 @@ viewer.show()  # opens in your browser
 
 ## Features
 
-- **16 entity graphics types** — point, billboard, label, polygon, polyline, box, cylinder, ellipse, ellipsoid, model, corridor, wall, rectangle, path, polyline volume, tileset
+- **17 entity graphics types** — point, billboard, label, polygon, polyline, box, cylinder, ellipse, ellipsoid, model, corridor, wall, rectangle, path, plane, polyline volume, tileset
+- **Particle systems** — scene primitives for smoke, fire, weather, and trails
 - **9 material types** — solid color, image, grid, stripe, checkerboard, polyline glow/arrow/dash/outline
 - **148 named colors** with `.with_alpha()` support
 - **Time-dynamic properties** — SampledPositionProperty, SampledProperty, ConstantProperty, and more

@@ -10,6 +10,7 @@ from cesiumkit.entities.ellipsoid import EllipsoidGraphics
 from cesiumkit.entities.label import LabelGraphics
 from cesiumkit.entities.model import ModelGraphics
 from cesiumkit.entities.path import PathGraphics
+from cesiumkit.entities.plane import Plane, PlaneGraphics
 from cesiumkit.entities.point import PointGraphics
 from cesiumkit.entities.polygon import PolygonGraphics, PolygonHierarchy
 from cesiumkit.entities.polyline import PolylineGraphics
@@ -31,6 +32,8 @@ __all__ = [
     "LabelGraphics",
     "ModelGraphics",
     "PathGraphics",
+    "Plane",
+    "PlaneGraphics",
     "PointGraphics",
     "PolygonGraphics",
     "PolygonHierarchy",

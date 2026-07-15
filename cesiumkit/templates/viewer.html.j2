@@ -91,6 +91,10 @@
         })();
         {% endfor %}
 
+        {% for primitive_js in primitives %}
+        viewer.scene.primitives.add({{ primitive_js }});
+        {% endfor %}
+
         {% for camera_op in camera_operations %}
         {{ camera_op }}
         {% endfor %}
@@ -102,6 +106,48 @@
         {% for custom_js in custom_scripts %}
         {{ custom_js }}
         {% endfor %}
+
+        // ── Runtime command bridge ──
+        async function __cesiumkitPostResult(requestId, result, error) {
+            const response = await fetch('/__cesiumkit_result', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({requestId, result, error}),
+            });
+            if (!response.ok) throw new Error('Failed to return runtime command result');
+        }
+
+        async function __cesiumkitPostEvent(event, result) {
+            const response = await fetch('/__cesiumkit_result', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({event, result}),
+            });
+            if (!response.ok) throw new Error('Failed to return runtime event');
+        }
+
+        let _cesiumkitCmdSeq = 0;
+        async function _cesiumkitPollCommands() {
+            try {
+                const resp = await fetch('/__cesiumkit_cmd?seq=' + _cesiumkitCmdSeq);
+                if (!resp.ok) return;
+                const cmd = await resp.json();
+                if (cmd.js) {
+                    try {
+                        eval(cmd.js);
+                    } catch (error) {
+                        console.error('cesiumkit runtime command failed:', error);
+                    } finally {
+                        _cesiumkitCmdSeq = cmd.seq;
+                    }
+                }
+            } catch (_) {
+                // The static HTML export has no runtime server.
+            } finally {
+                setTimeout(_cesiumkitPollCommands, 250);
+            }
+        }
+        _cesiumkitPollCommands();
     </script>
 </body>
 </html>

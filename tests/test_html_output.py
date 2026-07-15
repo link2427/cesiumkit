@@ -150,6 +150,39 @@ class TestFullHtmlOutput:
         assert "scene.requestRenderMode = true" in html
         assert "scene.maximumRenderTimeChange = 1.5" in html
 
+    def test_post_process_configuration(self):
+        viewer = cesiumkit.Viewer(
+            scene=cesiumkit.SceneConfig(
+                post_process=cesiumkit.PostProcessConfig(
+                    bloom=cesiumkit.BloomConfig(enabled=True, contrast=100, step_size=4),
+                    fxaa=cesiumkit.FXAAConfig(enabled=False),
+                    ambient_occlusion=cesiumkit.AmbientOcclusionConfig(enabled=True, intensity=2),
+                )
+            )
+        )
+        html = viewer.to_html()
+        assert "postProcessStages.bloom.enabled = true" in html
+        assert "postProcessStages.bloom.uniforms.contrast = 100.0" in html
+        assert "postProcessStages.bloom.uniforms.stepSize = 4.0" in html
+        assert "postProcessStages.fxaa.enabled = false" in html
+        assert "postProcessStages.ambientOcclusion.uniforms.intensity = 2.0" in html
+
+    def test_disabled_post_process_does_not_write_uniforms(self):
+        statements = cesiumkit.PostProcessConfig(
+            bloom=cesiumkit.BloomConfig(enabled=False),
+            ambient_occlusion=cesiumkit.AmbientOcclusionConfig(enabled=False),
+        ).to_js_statements()
+        assert statements == [
+            "viewer.scene.postProcessStages.bloom.enabled = false;",
+            "viewer.scene.postProcessStages.ambientOcclusion.enabled = false;",
+        ]
+
+    def test_post_process_validation(self):
+        with pytest.raises(ValidationError):
+            cesiumkit.BloomConfig(contrast=300)
+        with pytest.raises(ValidationError):
+            cesiumkit.AmbientOcclusionConfig(step_size=0)
+
     def test_time_dynamic_entity(self):
         pos = cesiumkit.SampledPositionProperty()
         pos.add_sample("2024-01-01T00:00:00Z", cesiumkit.Cartesian3.from_degrees(-75, 35, 100000))

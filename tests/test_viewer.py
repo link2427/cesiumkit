@@ -27,6 +27,34 @@ class TestViewer:
         assert "timeline: false" in html
         assert "geocoder: false" in html
 
+    def test_performance_controls(self):
+        v = cesiumkit.Viewer(
+            request_render_mode=True,
+            maximum_render_time_change=0.5,
+            resolution_scale=0.75,
+            target_frame_rate=30,
+            show_renderer_errors=False,
+        )
+        html = v.to_html()
+        assert "requestRenderMode: true" in html
+        assert "maximumRenderTimeChange: 0.5" in html
+        assert "viewer.resolutionScale = 0.75" in html
+        assert "targetFrameRate: 30" in html
+        assert "showRenderLoopErrors: false" in html
+
+    @pytest.mark.parametrize(
+        ("keyword", "value"),
+        [
+            ("maximum_render_time_change", -1),
+            ("resolution_scale", 0),
+            ("resolution_scale", float("inf")),
+            ("target_frame_rate", 0),
+        ],
+    )
+    def test_performance_control_validation(self, keyword, value):
+        with pytest.raises(ValueError):
+            cesiumkit.Viewer(**{keyword: value})
+
     def test_add_entity(self):
         v = cesiumkit.Viewer()
         v.add_entity(

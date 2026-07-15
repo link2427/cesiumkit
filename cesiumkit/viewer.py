@@ -64,6 +64,11 @@ class Viewer:
         timeline: bool | None = None,
         navigation_help_button: bool | None = None,
         navigation_instructions_initially_visible: bool | None = None,
+        request_render_mode: bool | None = None,
+        maximum_render_time_change: float | None = None,
+        resolution_scale: float | None = None,
+        target_frame_rate: int | None = None,
+        show_renderer_errors: bool | None = None,
         # Scene
         scene_mode: SceneMode | None = None,
         scene: Any = None,  # SceneConfig
@@ -109,6 +114,10 @@ class Viewer:
             "navigation_help_button": navigation_help_button,
             "navigation_instructions_initially_visible": navigation_instructions_initially_visible,
             "should_animate": should_animate,
+            "request_render_mode": request_render_mode,
+            "maximum_render_time_change": maximum_render_time_change,
+            "target_frame_rate": target_frame_rate,
+            "show_render_loop_errors": show_renderer_errors,
         }
         for key, val in opt_map.items():
             if val is not None:
@@ -120,6 +129,16 @@ class Viewer:
             self._viewer_options["terrain_provider"] = terrain_provider
         if imagery_provider is not None:
             self._viewer_options["imagery_provider"] = imagery_provider
+
+        if maximum_render_time_change is not None and (
+            not math.isfinite(maximum_render_time_change) or maximum_render_time_change < 0
+        ):
+            raise ValueError("maximum_render_time_change must be finite and non-negative")
+        if resolution_scale is not None and (not math.isfinite(resolution_scale) or resolution_scale <= 0):
+            raise ValueError("resolution_scale must be a positive finite number")
+        if target_frame_rate is not None and target_frame_rate <= 0:
+            raise ValueError("target_frame_rate must be positive")
+        self._resolution_scale = resolution_scale
 
         # Scene/Globe/Clock config (applied post-construction)
         self.scene_config = scene
@@ -609,9 +628,12 @@ class Viewer:
 
     def _build_scene_statements(self) -> list[str]:
         """Build JS statements for scene configuration."""
+        statements: list[str] = []
+        if self._resolution_scale is not None:
+            statements.append(f"viewer.resolutionScale = {self._resolution_scale};")
         if self.scene_config and hasattr(self.scene_config, "to_js_statements"):
-            return self.scene_config.to_js_statements("viewer")
-        return []
+            statements.extend(self.scene_config.to_js_statements("viewer"))
+        return statements
 
     def _build_globe_statements(self) -> list[str]:
         """Build JS statements for globe configuration."""

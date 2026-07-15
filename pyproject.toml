@@ -45,6 +45,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "pillow>=10",
     "pytest>=7.0",
     "pytest-cov",
     "ruff>=0.4",
@@ -57,6 +58,7 @@ gis = [
     "geopandas>=0.14",
     "shapely>=2.0",
 ]
+images = ["pillow>=10"]
 
 [project.urls]
 Homepage = "https://github.com/link2427/cesiumkit"

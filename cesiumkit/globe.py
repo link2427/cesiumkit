@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic import Field
+
 from cesiumkit._js_serializer import to_js_value
 from cesiumkit.base import CesiumBase
 
@@ -20,6 +22,8 @@ class GlobeConfig(CesiumBase):
     base_color: Any = None
     show_ground_atmosphere: bool | None = None
     show_sky_atmosphere: bool | None = None
+    terrain_exaggeration: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    terrain_exaggeration_relative_height: float | None = Field(default=None, allow_inf_nan=False)
 
     def _js_class_name(self) -> str:
         return "globe"
@@ -39,4 +43,10 @@ class GlobeConfig(CesiumBase):
             stmts.append(f"{viewer_var}.scene.globe.baseColor = {to_js_value(self.base_color)};")
         if self.show_ground_atmosphere is not None:
             stmts.append(f"{viewer_var}.scene.globe.showGroundAtmosphere = {str(self.show_ground_atmosphere).lower()};")
+        if self.terrain_exaggeration is not None:
+            stmts.append(f"{viewer_var}.scene.verticalExaggeration = {self.terrain_exaggeration};")
+        if self.terrain_exaggeration_relative_height is not None:
+            stmts.append(
+                f"{viewer_var}.scene.verticalExaggerationRelativeHeight = {self.terrain_exaggeration_relative_height};"
+            )
         return stmts

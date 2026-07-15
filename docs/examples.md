@@ -1,6 +1,6 @@
 # Examples
 
-The [`examples/`](https://github.com/link2427/cesiumkit/tree/main/examples) directory contains 10 runnable scripts covering all major features.
+The [`examples/`](https://github.com/link2427/cesiumkit/tree/main/examples) directory contains 11 runnable scripts covering all major features.
 
 Run any example:
 
@@ -23,6 +23,7 @@ python examples/01_basic_point.py
 | 08 | `08_czml_export.py` | Export entities to CZML format |
 | 09 | `09_camera_controls.py` | fly_to, set_view, look_at |
 | 10 | `10_event_handlers.py` | Click events and custom JavaScript |
+| 11 | `11_runtime_control.py` | Live clock control, selection, and Python click callbacks |
 
 ## Materials
 

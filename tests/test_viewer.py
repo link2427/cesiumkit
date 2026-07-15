@@ -1,5 +1,9 @@
 """Tests for cesiumkit.viewer module."""
 
+from collections import deque
+
+import pytest
+
 import cesiumkit
 
 
@@ -114,6 +118,44 @@ class TestViewer:
         html = v.to_html()
         assert "ScreenSpaceEventHandler" in html
         assert "LEFT_CLICK" in html
+
+    def test_runtime_clock_commands_escape_input(self):
+        v = cesiumkit.Viewer()
+        v.set_time("2024-01-01T00:00:00Z'); alert('nope")
+        commands = list(v._command_queue)
+        assert len(commands) == 2
+        assert "fromIso8601(\"2024-01-01T00:00:00Z'); alert('nope\")" in commands[0]["js"]
+        assert "if (viewer.timeline)" in commands[1]["js"]
+
+    def test_runtime_clock_controls(self):
+        v = cesiumkit.Viewer()
+        v.animate(False)
+        v.set_multiplier(60)
+        commands = [command["js"] for command in v._command_queue]
+        assert "viewer.clock.shouldAnimate = false;" in commands
+        assert "viewer.clock.multiplier = 60;" in commands
+
+    def test_multiplier_must_be_finite(self):
+        with pytest.raises(ValueError, match="finite"):
+            cesiumkit.Viewer().set_multiplier(float("nan"))
+
+    def test_runtime_bridge_is_rendered(self):
+        html = cesiumkit.Viewer().to_html()
+        assert "/__cesiumkit_cmd" in html
+        assert "/__cesiumkit_result" in html
+        assert "__cesiumkitPostResult" in html
+
+    def test_wait_for_runtime_result(self):
+        v = cesiumkit.Viewer()
+        v._runtime_results["request-1"] = "2024-01-01T00:00:00Z"
+        assert v._wait_for_runtime_result("request-1", timeout=0) == "2024-01-01T00:00:00Z"
+
+    def test_get_current_time_requires_running_server(self):
+        with pytest.raises(RuntimeError, match="show"):
+            cesiumkit.Viewer().get_current_time(timeout=0)
+
+    def test_runtime_queue_uses_deque(self):
+        assert isinstance(cesiumkit.Viewer()._command_queue, deque)
 
 
 class TestViewerCzmlExport:

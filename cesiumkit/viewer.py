@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import json
+import math
 import tempfile
+import threading
 import webbrowser
+from collections import deque
 from typing import Any
+from uuid import uuid4
 
 from cesiumkit._html import HtmlDocument
 from cesiumkit._js_serializer import camelize, to_js_value
@@ -124,6 +128,14 @@ class Viewer:
         self._tilesets: list[Any] = []
         self._event_handlers: list[EventHandler] = []
         self._custom_scripts: list[str] = []
+
+        # Runtime command queue (for live viewer control)
+        self._command_seq = 0
+        self._command_queue: deque[dict[str, Any]] = deque()
+        self._runtime_results: dict[str, Any] = {}
+        self._runtime_errors: dict[str, str] = {}
+        self._runtime_condition = threading.Condition()
+        self._server: Any = None
 
     # --- Entity convenience methods ---
 
@@ -258,6 +270,85 @@ class Viewer:
         """Point the camera at a target."""
         self.camera.look_at(target, offset)
 
+    # --- Runtime clock control ---
+
+    def _send_command(self, js: str) -> int:
+        """Queue a JS command for the live viewer to execute."""
+        with self._runtime_condition:
+            self._command_seq += 1
+            self._command_queue.append({"seq": self._command_seq, "js": js})
+            self._runtime_condition.notify_all()
+            return self._command_seq
+
+    def _request_runtime_result(self, expression: str, *, timeout: float) -> Any:
+        """Evaluate a JavaScript expression and wait for its JSON result."""
+        if self._server is None:
+            raise RuntimeError("The viewer must be running via show() before reading browser state")
+
+        request_id = uuid4().hex
+        request_id_js = json.dumps(request_id)
+        self._send_command(
+            "(async () => {"
+            "try {"
+            f"const value = ({expression});"
+            f"await __cesiumkitPostResult({request_id_js}, value, null);"
+            "} catch (error) {"
+            f"await __cesiumkitPostResult({request_id_js}, null, String(error));"
+            "}"
+            "})();"
+        )
+        return self._wait_for_runtime_result(request_id, timeout=timeout)
+
+    def _wait_for_runtime_result(self, request_id: str, *, timeout: float) -> Any:
+        """Wait for a result posted by the browser runtime bridge."""
+        with self._runtime_condition:
+            ready = self._runtime_condition.wait_for(
+                lambda: request_id in self._runtime_results or request_id in self._runtime_errors,
+                timeout=timeout,
+            )
+            if not ready:
+                raise TimeoutError(f"Browser response timed out after {timeout:g}s")
+            if request_id in self._runtime_errors:
+                message = self._runtime_errors.pop(request_id)
+                raise RuntimeError(f"Browser command failed: {message}")
+            return self._runtime_results.pop(request_id)
+
+    def set_time(self, iso_string: str) -> None:
+        """Jump the timeline to a specific ISO 8601 epoch and update the widget.
+
+        Example: ``viewer.set_time(\"2024-03-15T03:00:00Z\")``
+        """
+        iso_js = json.dumps(iso_string)
+        self._send_command(f"viewer.clock.currentTime = Cesium.JulianDate.fromIso8601({iso_js});")
+        self._send_command("if (viewer.timeline) viewer.timeline.updateFromClock();")
+
+    def animate(self, on: bool = True) -> None:
+        """Start or stop clock playback.
+
+        Example: ``viewer.animate(on=False)`` to pause.
+        """
+        val = "true" if on else "false"
+        self._send_command(f"viewer.clock.shouldAnimate = {val};")
+
+    def set_multiplier(self, multiplier: float) -> None:
+        """Change the clock playback speed.
+
+        Example: ``viewer.set_multiplier(3600)`` for 1 hour per second.
+        """
+        if not math.isfinite(multiplier):
+            raise ValueError("multiplier must be finite")
+        self._send_command(f"viewer.clock.multiplier = {multiplier};")
+
+    def get_current_time(self, *, timeout: float = 10.0) -> str:
+        """Return the live viewer clock as an ISO 8601 string."""
+        result = self._request_runtime_result(
+            "Cesium.JulianDate.toIso8601(viewer.clock.currentTime)",
+            timeout=timeout,
+        )
+        if not isinstance(result, str):
+            raise RuntimeError("Browser returned a non-string clock value")
+        return result
+
     # --- Serialization helpers ---
 
     def _build_viewer_options_js(self) -> str:
@@ -351,14 +442,16 @@ class Viewer:
         """Launch a local HTTP server and open the visualization in a browser.
 
         Cesium requires HTTP (not file://) due to web worker CORS restrictions.
-        The server runs in a background thread and shuts down on KeyboardInterrupt.
+        The server runs until interrupted. Call ``show()`` from a background
+        thread when other Python code needs to control the live viewer.
 
         Args:
             port: Port to serve on. 0 = auto-pick a free port.
             open_browser: Whether to automatically open the browser.
         """
         import os
-        from http.server import HTTPServer, SimpleHTTPRequestHandler
+        from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+        from urllib.parse import parse_qs, urlparse
 
         tmpdir = tempfile.mkdtemp(prefix="cesiumkit_")
         html_path = os.path.join(tmpdir, "index.html")
@@ -369,10 +462,80 @@ class Viewer:
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, directory=tmpdir, **kwargs)
 
+            def do_GET(self):
+                if self.path.startswith("/__cesiumkit_cmd"):
+                    self._handle_command_poll()
+                    return
+                super().do_GET()
+
+            def do_POST(self):
+                if self.path == "/__cesiumkit_result":
+                    self._handle_runtime_result()
+                    return
+                self.send_error(405)
+
+            def _handle_command_poll(self):
+                parsed = urlparse(self.path)
+                params = parse_qs(parsed.query)
+                try:
+                    client_seq = int(params.get("seq", [0])[0])
+                except (TypeError, ValueError):
+                    self.send_error(400, "Invalid command sequence")
+                    return
+
+                with self._viewer._runtime_condition:
+                    while self._viewer._command_queue and self._viewer._command_queue[0]["seq"] <= client_seq:
+                        self._viewer._command_queue.popleft()
+                    cmd = self._viewer._command_queue[0] if self._viewer._command_queue else None
+
+                body = json.dumps(cmd or {}).encode("utf-8")
+
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def _handle_runtime_result(self):
+                try:
+                    content_length = int(self.headers.get("Content-Length", "0"))
+                except ValueError:
+                    self.send_error(400, "Invalid content length")
+                    return
+                if content_length <= 0 or content_length > 100 * 1024 * 1024:
+                    self.send_error(413, "Invalid result payload size")
+                    return
+
+                try:
+                    data = json.loads(self.rfile.read(content_length))
+                    request_id = data["requestId"]
+                    if not isinstance(request_id, str):
+                        raise TypeError
+                except (json.JSONDecodeError, KeyError, TypeError):
+                    self.send_error(400, "Invalid result payload")
+                    return
+
+                with self._viewer._runtime_condition:
+                    if data.get("error") is not None:
+                        self._viewer._runtime_errors[request_id] = str(data["error"])
+                    else:
+                        self._viewer._runtime_results[request_id] = data.get("result")
+                    self._viewer._runtime_condition.notify_all()
+
+                body = b'{"ok":true}'
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
             def log_message(self, format, *args):
                 pass  # Suppress request logs
 
-        server = HTTPServer(("127.0.0.1", port), Handler)
+        Handler._viewer = self  # Attach viewer for command queue access
+
+        server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+        self._server = server
         actual_port = server.server_address[1]
         url = f"http://127.0.0.1:{actual_port}/index.html"
 
@@ -387,6 +550,7 @@ class Viewer:
             print("\nServer stopped.")
         finally:
             server.server_close()
+            self._server = None
 
     def show_in_browser(self) -> None:
         """Alias for show(). Opens visualization via local HTTP server."""

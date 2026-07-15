@@ -158,6 +158,7 @@ class Viewer:
         self.entities = EntityCollection()
         self._data_sources: list[Any] = []
         self._tilesets: list[Any] = []
+        self._primitives: list[Any] = []
         self._event_handlers: list[EventHandler] = []
         self._custom_scripts: list[str] = []
 
@@ -275,6 +276,21 @@ class Viewer:
         ts = Cesium3DTileset(url=url, ion_asset_id=ion_asset_id, **kwargs)
         self._tilesets.append(ts)
         return ts
+
+    def add_primitive(self, primitive: Any) -> Any:
+        """Add a scene primitive such as a particle system."""
+        self._primitives.append(primitive)
+        return primitive
+
+    def add_particle_system(self, particle_system: Any = None, **kwargs: Any) -> Any:
+        """Add a :class:`cesiumkit.ParticleSystem` scene primitive."""
+        if particle_system is None:
+            from cesiumkit.particle import ParticleSystem
+
+            particle_system = ParticleSystem(**kwargs)
+        elif kwargs:
+            raise TypeError("keyword options cannot be combined with a particle_system instance")
+        return self.add_primitive(particle_system)
 
     # --- Event handling ---
 
@@ -618,6 +634,10 @@ class Viewer:
         """Build JS expressions for all tilesets."""
         return [ts.to_js() for ts in self._tilesets]
 
+    def _build_primitive_js_list(self) -> list[str]:
+        """Build JS expressions for synchronous scene primitives."""
+        return [primitive.to_js() for primitive in self._primitives]
+
     def _build_camera_operations(self) -> list[str]:
         """Build JS statements for camera operations."""
         return self.camera.to_js_operations("viewer")
@@ -664,6 +684,7 @@ class Viewer:
             entities=self._build_entity_js_list(),
             data_sources=self._build_data_source_js_list(),
             tilesets=self._build_tileset_js_list(),
+            primitives=self._build_primitive_js_list(),
             camera_operations=self._build_camera_operations(),
             event_handlers=self._build_event_handler_js(),
             scene_statements=self._build_scene_statements(),

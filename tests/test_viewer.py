@@ -233,6 +233,31 @@ class TestViewer:
         )
         assert v.drill_pick(cesiumkit.Cartesian2(x=1, y=2)) == [local]
 
+    def test_screenshot_base64_uses_runtime_result(self, monkeypatch):
+        v = cesiumkit.Viewer()
+        monkeypatch.setattr(v, "_request_runtime_result", lambda expression, *, timeout: "cG5n")
+        assert v.screenshot_base64(timeout=1) == "cG5n"
+
+    def test_screenshot_writes_decoded_png(self, tmp_path, monkeypatch):
+        v = cesiumkit.Viewer()
+        monkeypatch.setattr(v, "screenshot_base64", lambda *, timeout: "cG5n")
+        path = tmp_path / "viewer.png"
+        v.screenshot(path)
+        assert path.read_bytes() == b"png"
+
+    def test_screenshot_rejects_malformed_base64(self, monkeypatch):
+        v = cesiumkit.Viewer()
+        monkeypatch.setattr(v, "screenshot_base64", lambda *, timeout: "not base64!")
+        with pytest.raises(RuntimeError, match="malformed"):
+            v.screenshot("unused.png")
+
+    def test_canvas_to_image(self, monkeypatch):
+        png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+        v = cesiumkit.Viewer()
+        monkeypatch.setattr(v, "screenshot_base64", lambda *, timeout: png)
+        image = v.canvas_to_image()
+        assert image.size == (1, 1)
+
 
 class TestViewerCzmlExport:
     def test_basic_czml_export(self):

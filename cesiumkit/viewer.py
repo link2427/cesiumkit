@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import math
 import tempfile
@@ -10,6 +12,9 @@ import time
 import webbrowser
 from collections import deque
 from collections.abc import Iterable
+from io import BytesIO
+from os import PathLike
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
@@ -21,6 +26,8 @@ from cesiumkit.events import EventHandler
 from cesiumkit.utils import JsCode
 
 if TYPE_CHECKING:
+    from PIL.Image import Image as PILImage
+
     from cesiumkit.coordinates import Cartesian2
     from cesiumkit.entities._base import Entity
 
@@ -354,6 +361,46 @@ class Viewer:
         if not isinstance(result, str):
             raise RuntimeError("Browser returned a non-string clock value")
         return result
+
+    # --- Screenshot export ---
+
+    def screenshot_base64(self, *, timeout: float = 10.0) -> str:
+        """Return a PNG screenshot of the live viewer as base64 text."""
+        result = self._request_runtime_result(
+            "(() => {"
+            "viewer.scene.requestRender();"
+            "viewer.scene.render();"
+            "return viewer.scene.canvas.toDataURL('image/png').split(',')[1];"
+            "})()",
+            timeout=timeout,
+        )
+        if not isinstance(result, str):
+            raise RuntimeError("Browser returned an invalid screenshot payload")
+        return result
+
+    def _screenshot_bytes(self, *, timeout: float) -> bytes:
+        """Decode a live screenshot and validate its base64 payload."""
+        try:
+            return base64.b64decode(self.screenshot_base64(timeout=timeout), validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise RuntimeError("Browser returned malformed screenshot data") from exc
+
+    def screenshot(self, path: str | PathLike[str], *, timeout: float = 10.0) -> None:
+        """Save a PNG screenshot of the live viewer."""
+        Path(path).write_bytes(self._screenshot_bytes(timeout=timeout))
+
+    def canvas_to_image(self, *, timeout: float = 10.0) -> PILImage:
+        """Return a screenshot as a detached Pillow image.
+
+        Install the optional ``images`` extra to use this method.
+        """
+        try:
+            from PIL import Image
+        except ImportError as exc:  # pragma: no cover - depends on optional installation
+            raise ImportError("canvas_to_image() requires `pip install cesiumkit[images]`") from exc
+
+        with Image.open(BytesIO(self._screenshot_bytes(timeout=timeout))) as image:
+            return image.copy()
 
     # --- Entity picking and selection ---
 

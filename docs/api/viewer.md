@@ -47,3 +47,13 @@ picked = viewer.pick(cesiumkit.Cartesian2(x=100, y=200))
 all_picked = viewer.drill_pick(cesiumkit.Cartesian2(x=100, y=200))
 viewer.deselect()
 ```
+
+## Screenshots
+
+Capture the live canvas as a file, base64 text, or a Pillow image:
+
+```python
+viewer.screenshot("output.png")
+encoded = viewer.screenshot_base64()
+image = viewer.canvas_to_image()  # pip install cesiumkit[images]
+```

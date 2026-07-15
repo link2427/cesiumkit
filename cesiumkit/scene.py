@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic import Field
+
 from cesiumkit._js_serializer import to_js_value
 from cesiumkit.base import CesiumBase
 from cesiumkit.enums import SceneMode
@@ -24,7 +26,7 @@ class SceneConfig(CesiumBase):
     background_color: Any = None
     order_independent_translucency: bool | None = None
     request_render_mode: bool | None = None
-    maximum_render_time_change: float | None = None
+    maximum_render_time_change: float | None = Field(default=None, ge=0, allow_inf_nan=False)
 
     def _js_class_name(self) -> str:
         return "scene"

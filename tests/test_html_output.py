@@ -139,6 +139,17 @@ class TestFullHtmlOutput:
         assert "skyBox.show = false" in html
         assert "fog.enabled = false" in html
 
+    def test_scene_config_render_mode(self):
+        viewer = cesiumkit.Viewer(
+            scene=cesiumkit.SceneConfig(
+                request_render_mode=True,
+                maximum_render_time_change=1.5,
+            )
+        )
+        html = viewer.to_html()
+        assert "scene.requestRenderMode = true" in html
+        assert "scene.maximumRenderTimeChange = 1.5" in html
+
     def test_time_dynamic_entity(self):
         pos = cesiumkit.SampledPositionProperty()
         pos.add_sample("2024-01-01T00:00:00Z", cesiumkit.Cartesian3.from_degrees(-75, 35, 100000))

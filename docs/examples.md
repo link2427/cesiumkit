@@ -58,11 +58,13 @@ entity = cesiumkit.Entity(
 ## Data sources
 
 ```python
-viewer.add_data_source(cesiumkit.GeoJsonDataSource(
-    url="https://example.com/data.geojson",
-    stroke=cesiumkit.Color.RED,
-    fill=cesiumkit.Color.RED.with_alpha(0.3),
-))
+viewer.add_data_source(
+    cesiumkit.GeoJsonDataSource(
+        url="https://example.com/data.geojson",
+        stroke=cesiumkit.Color.RED,
+        fill=cesiumkit.Color.RED.with_alpha(0.3),
+    )
+)
 ```
 
 ## Camera control

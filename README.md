@@ -16,11 +16,13 @@ cesiumkit gives you a Pythonic, object-oriented API for [CesiumJS](https://cesiu
 import cesiumkit
 
 viewer = cesiumkit.Viewer(title="Hello Globe")
-viewer.add_entity(cesiumkit.Entity(
-    name="New York",
-    position=cesiumkit.Cartesian3.from_degrees(-74.006, 40.7128, 400),
-    point=cesiumkit.PointGraphics(pixel_size=12, color=cesiumkit.Color.RED),
-))
+viewer.add_entity(
+    cesiumkit.Entity(
+        name="New York",
+        position=cesiumkit.Cartesian3.from_degrees(-74.006, 40.7128, 400),
+        point=cesiumkit.PointGraphics(pixel_size=12, color=cesiumkit.Color.RED),
+    )
+)
 viewer.show()  # opens in your browser
 ```
 
@@ -68,7 +70,7 @@ viewer.add_geodataframe(
     gdf,
     name_column="NAME",
     color_column="color_hex",
-    extruded_height_column="gdp",   # polygons become 3D prisms
+    extruded_height_column="gdp",  # polygons become 3D prisms
     fill_alpha=0.5,
 )
 viewer.show()
@@ -83,19 +85,21 @@ positions — pass a `shapely.Point` directly to `Entity(position=...)` or a
 Points, billboards, labels, polygons, polylines, boxes, cylinders, ellipses, ellipsoids, corridors, walls, rectangles, paths, polyline volumes, and 3D models -- all as clean Python objects.
 
 ```python
-viewer.add_entity(cesiumkit.Entity(
-    name="Headquarters",
-    position=cesiumkit.Cartesian3.from_degrees(-77.0369, 38.9072, 0),
-    polygon=cesiumkit.PolygonGraphics(
-        hierarchy=[
-            cesiumkit.Cartesian3.from_degrees(-77.04, 38.91),
-            cesiumkit.Cartesian3.from_degrees(-77.03, 38.91),
-            cesiumkit.Cartesian3.from_degrees(-77.035, 38.905),
-        ],
-        material=cesiumkit.Color.CORNFLOWERBLUE.with_alpha(0.6),
-        extruded_height=200,
-    ),
-))
+viewer.add_entity(
+    cesiumkit.Entity(
+        name="Headquarters",
+        position=cesiumkit.Cartesian3.from_degrees(-77.0369, 38.9072, 0),
+        polygon=cesiumkit.PolygonGraphics(
+            hierarchy=[
+                cesiumkit.Cartesian3.from_degrees(-77.04, 38.91),
+                cesiumkit.Cartesian3.from_degrees(-77.03, 38.91),
+                cesiumkit.Cartesian3.from_degrees(-77.035, 38.905),
+            ],
+            material=cesiumkit.Color.CORNFLOWERBLUE.with_alpha(0.6),
+            extruded_height=200,
+        ),
+    )
+)
 ```
 
 ### Materials
@@ -117,12 +121,15 @@ Animate entities along paths using sampled position properties with configurable
 
 ```python
 prop = cesiumkit.SampledPositionProperty(interpolation_degree=2)
-prop.add_sample(cesiumkit.JulianDate.from_iso8601("2024-01-01T00:00:00Z"),
-                cesiumkit.Cartesian3.from_degrees(-122.4, 37.8, 10000))
-prop.add_sample(cesiumkit.JulianDate.from_iso8601("2024-01-01T01:00:00Z"),
-                cesiumkit.Cartesian3.from_degrees(-73.9, 40.7, 10000))
-entity = cesiumkit.Entity(name="Flight", position=prop,
-                          path=cesiumkit.PathGraphics(width=2, material=cesiumkit.Color.YELLOW))
+prop.add_sample(
+    cesiumkit.JulianDate.from_iso8601("2024-01-01T00:00:00Z"), cesiumkit.Cartesian3.from_degrees(-122.4, 37.8, 10000)
+)
+prop.add_sample(
+    cesiumkit.JulianDate.from_iso8601("2024-01-01T01:00:00Z"), cesiumkit.Cartesian3.from_degrees(-73.9, 40.7, 10000)
+)
+entity = cesiumkit.Entity(
+    name="Flight", position=prop, path=cesiumkit.PathGraphics(width=2, material=cesiumkit.Color.YELLOW)
+)
 ```
 
 ### Live runtime control
@@ -145,11 +152,13 @@ for the server lifecycle and complete examples.
 Load GeoJSON, CZML, and KML directly.
 
 ```python
-viewer.add_data_source(cesiumkit.GeoJsonDataSource(
-    url="https://example.com/data.geojson",
-    stroke=cesiumkit.Color.RED,
-    fill=cesiumkit.Color.RED.with_alpha(0.3),
-))
+viewer.add_data_source(
+    cesiumkit.GeoJsonDataSource(
+        url="https://example.com/data.geojson",
+        stroke=cesiumkit.Color.RED,
+        fill=cesiumkit.Color.RED.with_alpha(0.3),
+    )
+)
 ```
 
 ### Camera control

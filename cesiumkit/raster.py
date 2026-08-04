@@ -30,7 +30,7 @@ class RasterSource:
         self._source = source
         self.path = str(source) if isinstance(source, (str, Path)) else None
         self.name = name or (Path(self.path).stem if self.path else "raster")
-        self._reader = None
+        self._reader: Any = None
         self._lock = threading.Lock()
 
     def _open_reader(self):
@@ -40,9 +40,11 @@ class RasterSource:
             with self._lock:
                 if self._reader is None:
                     if self.path is not None:
-                        self._reader = Reader(self.path)
+                        # rio-tiler's attrs-based __init__ has an undetectable
+                        # NOTHING sentinel default; pyright treats it as required.
+                        self._reader = Reader(self.path)  # pyright: ignore[reportCallIssue]
                     else:
-                        self._reader = XarrayReader(self._source)
+                        self._reader = XarrayReader(self._source)  # pyright: ignore[reportCallIssue]
         return self._reader
 
     def tile(self, z: int, x: int, y: int) -> bytes | None:
@@ -56,10 +58,9 @@ class RasterSource:
 
     def close(self) -> None:
         if self._reader is not None:
-            try:
-                self._reader.close()
-            except Exception:
-                pass
+            closer = getattr(self._reader, "close", None)
+            if callable(closer):
+                closer()
             self._reader = None
 
 

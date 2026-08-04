@@ -22,7 +22,8 @@ class JulianDate(CesiumBase):
             return f'Cesium.JulianDate.fromIso8601("{self.iso8601}")'
         raise ValueError("JulianDate requires iso8601 string")
 
-    def to_czml(self) -> dict:
+    def to_czml(self) -> str:
+        """Serialize to the CZML ISO 8601 time string."""
         return self.iso8601 or ""
 
     @classmethod

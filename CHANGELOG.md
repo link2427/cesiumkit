@@ -4,6 +4,37 @@ All notable changes to cesiumkit are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - 2026-08-04
+
+### Added
+
+- **Typed package (PEP 561).** `cesiumkit/py.typed` ships in the wheel and a
+  CI job asserts it is present. pyright type-checks the package in CI and
+  reports 0 errors on the public API.
+- **Typed `Viewer` constructor.** `scene`, `globe`, `clock`, `camera`,
+  `terrain_provider`, `imagery_provider`, and `clustering` now take their
+  concrete config/provider types instead of `Any`.
+- **Docs growth.** A step-by-step flight-tracker tutorial whose code runs
+  headlessly, a troubleshooting page, and an architecture (explanation)
+  page. Every API reference page now has a runnable usage snippet.
+- **Doctest guard.** CI runs `pytest --doctest-modules cesiumkit`, so
+  docstring examples cannot drift from behavior.
+
+### Changed
+
+- Docs reorganized by Diátaxis type: how-tos are titled "How to ..." with
+  numbered steps and a runnable example first; reference pages are labelled
+  as such. Slop pass removed vague language and verified every claim
+  against code (the named-color count is now 149, not 148).
+- The Examples index and the Gallery cross-link, with the gallery called
+  out as a curated subset of the 11 examples.
+
+### Fixed
+
+- 27 pyright errors across the public API, including the untyped `_viewer`
+  on the local HTTP handler, an incompatible widget message handler
+  override, and several `getattr`-based serialization paths.
+
 ## [0.6.0] - 2026-08-04
 
 ### Added

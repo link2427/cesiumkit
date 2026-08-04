@@ -142,7 +142,7 @@ class TestBridgePythonSide:
         def fake_send(content):
             sent["content"] = content
             # Simulate the JS side replying synchronously.
-            widget._handle_msg(
+            widget._on_widget_message(
                 widget,
                 {"type": "result", "requestId": content["requestId"], "result": "2026-01-01T00:00:00Z"},
                 [],
@@ -156,7 +156,7 @@ class TestBridgePythonSide:
         widget = CesiumKitWidget(_viewer())
         clicked = []
         widget.on_click(lambda entity_id: clicked.append(entity_id))
-        widget._handle_msg(widget, {"type": "event", "event": "click", "result": "abc"}, [])
+        widget._on_widget_message(widget, {"type": "event", "event": "click", "result": "abc"}, [])
         assert clicked == ["abc"]
 
 

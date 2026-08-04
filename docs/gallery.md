@@ -1,9 +1,10 @@
 # Gallery
 
-Screenshots generated from the runnable scripts in
-[`scripts/gallery/`](https://github.com/link2427/cesiumkit/tree/main/scripts/gallery).
-Each image is produced by importing the script, rendering its `viewer` to
-HTML, and screenshotting it with playwright in CI.
+_Reference. Screenshots of every script in
+[`scripts/gallery/`](https://github.com/link2427/cesiumkit/tree/main/scripts/gallery),
+regenerated headlessly in CI. The six gallery scripts are a curated subset;
+for the full runnable set of 11 scripts, see the [Examples](examples.md)
+index._
 
 <div class="grid cards" markdown>
 

@@ -61,7 +61,7 @@ def _load_page(url: str, *, viewport: dict[str, int], wait_ms: int):
     """Load a page, collect page errors, and return (page, errors, browser)."""
     playwright = _playwright()
     browser = playwright.chromium.launch(args=["--no-sandbox", "--disable-dev-shm-usage"])
-    page = browser.new_page(viewport=viewport)
+    page = browser.new_page(viewport={"width": viewport["width"], "height": viewport["height"]})
     errors: list[str] = []
     page.on("pageerror", lambda exc: errors.append(str(exc)))
     page.goto(url, wait_until="load")

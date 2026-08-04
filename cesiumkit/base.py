@@ -58,8 +58,8 @@ class CesiumBase(BaseModel):
         opts = "{\n    " + ",\n    ".join(parts) + "\n}"
         return f"new {self._js_class_name()}({opts})"
 
-    def to_czml(self) -> dict:
-        """Serialize to a CZML-compatible dict. Override in subclasses."""
+    def to_czml(self) -> dict[str, Any] | str:
+        """Serialize to a CZML-compatible value. Override in subclasses."""
         raise NotImplementedError(f"{self.__class__.__name__} does not support CZML export")
 
 

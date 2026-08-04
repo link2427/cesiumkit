@@ -230,7 +230,7 @@ viewer.on(
 - **17 entity graphics types**: point, billboard, label, polygon, polyline, box, cylinder, ellipse, ellipsoid, model, corridor, wall, rectangle, path, plane, polyline volume, tileset
 - **Particle systems**: validated scene primitives for smoke, fire, weather, and engine trails
 - **9 material types**: solid color, image, grid, stripe, checkerboard, polyline glow/arrow/dash/outline
-- **148 named colors** with `.with_alpha()` support
+- **149 named colors** with `.with_alpha()` support
 - **Time-dynamic properties**: SampledPositionProperty, SampledProperty, ConstantProperty, TimeIntervalCollectionProperty, ReferenceProperty, CompositeProperty
 - **Data sources**: GeoJSON, CZML, KML, custom
 - **Imagery providers**: Bing, OSM, SingleTile, WMTS, WMS, URL template, Ion, TMS
@@ -251,6 +251,7 @@ viewer.on(
 - **Headless render testing**: `cesiumkit.testing` renders and screenshots viewers in CI without a display (playwright)
 - **Works without Ion token**: falls back to the bundled NaturalEarthII imagery (offline when vendored)
 - **Pydantic v2 models**: full validation on all inputs
+- **Type-checked**: PEP 561 `py.typed` marker ships in the wheel; the public API is pyright-clean
 
 ## API overview
 
@@ -259,7 +260,7 @@ viewer.on(
 | `cesiumkit.Viewer` | Main entry point -- configure, add entities, show |
 | `cesiumkit.Entity` | Container for a named entity with position + graphics |
 | `cesiumkit.Cartesian3` | 3D coordinates, with `.from_degrees()` helper |
-| `cesiumkit.Color` | 148 named colors + RGBA + `.with_alpha()` |
+| `cesiumkit.Color` | 149 named colors + RGBA + `.with_alpha()` |
 | `cesiumkit.*Graphics` | PointGraphics, PolygonGraphics, ModelGraphics, ... |
 | `cesiumkit.*Material` | StripeMaterial, PolylineGlowMaterial, ... |
 | `cesiumkit.*Property` | SampledPositionProperty, ConstantProperty, ... |

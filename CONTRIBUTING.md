@@ -159,3 +159,21 @@ my_type: MyTypeGraphics | None = None
 3. Run `pytest` and make sure all tests pass.
 4. Write a clear PR description explaining what changed and why.
 5. Submit!
+
+## Releasing
+
+Releases are cut from `main` with an annotated tag (`vX.Y.Z`, matching the
+`version` in `pyproject.toml`):
+
+1. Bump the version in `pyproject.toml` and `cesiumkit/_version.py`, add a
+   dated `## [X.Y.Z]` entry to `CHANGELOG.md` (Keep a Changelog format), and
+   merge that as a normal PR.
+2. Create the release: `gh release create vX.Y.Z --title "cesiumkit vX.Y.Z"`.
+   The release notes summarize what changed; the last line must link the
+   changelog, e.g. `Full changelog: https://github.com/link2427/cesiumkit/blob/main/CHANGELOG.md`.
+3. The release event runs `Publish to PyPI` (fetches the vendored Cesium
+   build, builds, publishes) and `Gallery` (regenerates example screenshots)
+   automatically.
+4. Verify: the publish run succeeds and `https://pypi.org/project/cesiumkit/`
+   shows the new version; the gallery run finishes and its screenshots are
+   committed to `gallery-images`.

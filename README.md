@@ -53,6 +53,21 @@ For GeoPandas / Shapely support:
 pip install cesiumkit[gis]
 ```
 
+### Offline use
+
+By default the generated pages load CesiumJS from the CDN. To run fully
+offline (air-gapped machines, CI, headless servers), vendor the Cesium build
+once and `show()` will serve it locally, including the NaturalEarthII
+fallback imagery:
+
+```bash
+python scripts/fetch_cesium.py   # downloads the CesiumJS 1.144 release (~120 MB)
+```
+
+The wheel built by the PyPI publish workflow includes the vendored build, so
+`pip install cesiumkit` works offline out of the box after that point.
+Static HTML export and Jupyter embedding still load from the CDN.
+
 ## Features
 
 ### GeoPandas / Shapely integration
@@ -226,8 +241,8 @@ viewer.on(
 - **Runtime control**: clock, live CZML/GeoJSON, selection, picking, screenshots, and Python click callbacks
 - **Event handling**: ScreenSpaceEventHandler with custom JS or Python callbacks
 - **Custom JavaScript injection**: add_script() for arbitrary JS
-- **Local HTTP server**: `show()` launches a server and opens the browser
-- **Works without Ion token**: falls back to bundled NaturalEarthII imagery
+- **Local HTTP server**: `show()` launches a server and opens the browser; serves a bundled offline Cesium build when present
+- **Works without Ion token**: falls back to the bundled NaturalEarthII imagery (offline when vendored)
 - **Pydantic v2 models**: full validation on all inputs
 
 ## API overview

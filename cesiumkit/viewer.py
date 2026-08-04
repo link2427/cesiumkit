@@ -20,8 +20,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
-from cesiumkit._html import HtmlDocument
+from cesiumkit._html import DEFAULT_CESIUM_VERSION, HtmlDocument
 from cesiumkit._js_serializer import camelize, to_js_value
+from cesiumkit._vendor import vendor_base_url, vendor_dir
 from cesiumkit.czml import CzmlDocument
 from cesiumkit.enums import SceneMode, ScreenSpaceEventType
 from cesiumkit.events import EventHandler
@@ -52,7 +53,7 @@ class Viewer:
         width: str = "100%",
         height: str = "100%",
         # Cesium version
-        cesium_version: str = "1.119",
+        cesium_version: str | None = None,
         # Title
         title: str = "cesiumkit",
         # Viewer constructor options
@@ -99,7 +100,7 @@ class Viewer:
         self.container_id = container_id
         self.width = width
         self.height = height
-        self.cesium_version = cesium_version
+        self.cesium_version = cesium_version or DEFAULT_CESIUM_VERSION
         self.title = title
 
         # Viewer options
@@ -130,9 +131,11 @@ class Viewer:
         if scene_mode is not None:
             self._viewer_options["scene_mode"] = scene_mode
         if terrain_provider is not None:
-            self._viewer_options["terrain_provider"] = terrain_provider
+            self._terrain_provider = terrain_provider
+        else:
+            self._terrain_provider = None
         if imagery_provider is not None:
-            self._viewer_options["imagery_provider"] = imagery_provider
+            self._viewer_options["base_layer"] = imagery_provider
 
         if maximum_render_time_change is not None and (
             not math.isfinite(maximum_render_time_change) or maximum_render_time_change < 0
@@ -685,15 +688,15 @@ class Viewer:
 
         parts: list[str] = []
         for key, value in self._viewer_options.items():
+            # The imagery provider must be wrapped in an ImageryLayer and
+            # passed as `baseLayer`; the old `imageryProvider` viewer option
+            # was removed in Cesium 1.144.
+            if key == "base_layer" and hasattr(value, "to_js"):
+                parts.append(f"baseLayer: new Cesium.ImageryLayer({value.to_js()})")
+                continue
             js_key = camelize(key)
-            # Special handling for terrain_provider (async)
-            if key == "terrain_provider" and hasattr(value, "to_js"):
-                js_val = value.to_js()
-                # If it's an async provider, we handle it separately
-                parts.append(f"{js_key}: {js_val}")
-            else:
-                js_val = to_js_value(value)
-                parts.append(f"{js_key}: {js_val}")
+            js_val = to_js_value(value)
+            parts.append(f"{js_key}: {js_val}")
 
         return "{\n        " + ",\n        ".join(parts) + "\n    }"
 
@@ -742,12 +745,24 @@ class Viewer:
             return self.clock_config.to_js_statements("viewer")
         return []
 
+    def _build_terrain_statement(self) -> str | None:
+        """Build the JS expression assigned to scene.terrainProvider."""
+        if self._terrain_provider is None:
+            return None
+        return self._terrain_provider.to_js()
+
     # --- Output methods ---
 
-    def to_html(self) -> str:
-        """Render the complete standalone HTML document string."""
+    def _render_html(self, cesium_base_url: str | None = None) -> str:
+        """Render the full HTML document, optionally from a local Cesium build.
+
+        Args:
+            cesium_base_url: URL prefix of the directory containing Cesium.js.
+                None loads Cesium from the CDN at self.cesium_version.
+        """
         doc = HtmlDocument(
             cesium_version=self.cesium_version,
+            cesium_base_url=cesium_base_url,
             ion_token=self.ion_token,
             width=self.width,
             height=self.height,
@@ -765,8 +780,13 @@ class Viewer:
             scene_statements=self._build_scene_statements(),
             globe_statements=self._build_globe_statements(),
             clock_statements=self._build_clock_statements(),
+            terrain_statement=self._build_terrain_statement(),
             custom_scripts=self._custom_scripts,
         )
+
+    def to_html(self) -> str:
+        """Render the complete standalone HTML document string."""
+        return self._render_html()
 
     def save(self, path: str) -> None:
         """Save to an HTML file."""
@@ -790,12 +810,31 @@ class Viewer:
 
         tmpdir = tempfile.mkdtemp(prefix="cesiumkit_")
         html_path = os.path.join(tmpdir, "index.html")
+        cesium_base_url = vendor_base_url()
         with open(html_path, "w", encoding="utf-8") as f:
-            f.write(self.to_html())
+            f.write(self._render_html(cesium_base_url=cesium_base_url))
 
         class Handler(SimpleHTTPRequestHandler):
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, directory=tmpdir, **kwargs)
+
+            def translate_path(self, path):
+                # Serve the bundled Cesium build (if present) from the
+                # installed package, without copying it into the temp dir.
+                if cesium_base_url and path.startswith(cesium_base_url + "/"):
+                    vendor = vendor_dir()
+                    if vendor is None:
+                        return super().translate_path(path)
+                    rel = path[len(cesium_base_url) :].lstrip("/")
+                    vendor_root = os.path.realpath(str(vendor))
+                    target = os.path.realpath(os.path.join(vendor_root, rel))
+                    if os.path.commonpath([vendor_root, target]) != vendor_root:
+                        # Path traversal outside the vendor dir: fall through
+                        # to the base handler, which strips ".." segments and
+                        # looks under the temp dir -> 404.
+                        return super().translate_path(path)
+                    return target
+                return super().translate_path(path)
 
             def do_GET(self):
                 if self.path.startswith("/__cesiumkit_cmd"):

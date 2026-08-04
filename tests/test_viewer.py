@@ -81,6 +81,27 @@ class TestViewer:
         html = v.to_html()
         assert "releases/1.115/" in html
 
+    def test_default_cesium_version(self):
+        html = cesiumkit.Viewer().to_html()
+        assert "releases/1.144/" in html
+
+    def test_imagery_provider_uses_base_layer(self):
+        v = cesiumkit.Viewer(
+            ion_token="tok",
+            imagery_provider=cesiumkit.IonImageryProvider(asset_id=75343),
+        )
+        html = v.to_html()
+        assert "baseLayer: new Cesium.ImageryLayer(new Cesium.IonImageryProvider({" in html
+        assert "imageryProvider:" not in html
+
+    def test_terrain_provider_assigned_after_viewer_creation(self):
+        v = cesiumkit.Viewer(
+            terrain_provider=cesiumkit.CesiumTerrainProvider(url="https://assets.cesium.com/1"),
+        )
+        html = v.to_html()
+        assert "viewer.scene.terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(" in html
+        assert "terrainProvider:" not in html
+
     def test_custom_container(self):
         v = cesiumkit.Viewer(container_id="myContainer")
         html = v.to_html()

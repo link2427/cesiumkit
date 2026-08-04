@@ -37,6 +37,16 @@ class CesiumTerrainProvider(TerrainProvider):
     def _js_class_name(self) -> str:
         return "Cesium.CesiumTerrainProvider"
 
+    def to_js(self) -> str:
+        """Serialize to an async CesiumTerrainProvider.fromUrl(...) call."""
+        opts: dict[str, str] = {"url": json.dumps(self.url)}
+        if self.request_water_mask:
+            opts["requestWaterMask"] = "true"
+        if self.request_vertex_normals:
+            opts["requestVertexNormals"] = "true"
+        opts_str = ", ".join(f"{k}: {v}" for k, v in opts.items())
+        return f"Cesium.CesiumTerrainProvider.fromUrl({{{opts_str}}})"
+
 
 class IonTerrainProvider(TerrainProvider):
     """Provides terrain from Cesium Ion (default: Cesium World Terrain)."""
@@ -49,15 +59,17 @@ class IonTerrainProvider(TerrainProvider):
         return "Cesium.CesiumTerrainProvider"
 
     def to_js(self) -> str:
-        opts: dict[str, bool] = {}
+        opts: dict[str, str] = {}
         if self.request_water_mask:
-            opts["requestWaterMask"] = True
+            opts["requestWaterMask"] = "true"
         if self.request_vertex_normals:
-            opts["requestVertexNormals"] = True
-        if opts:
-            opts_str = ", ".join(f"{k}: {str(v).lower()}" for k, v in opts.items())
-            return f"Cesium.createWorldTerrainAsync({{{opts_str}}})"
-        return "Cesium.createWorldTerrainAsync()"
+            opts["requestVertexNormals"] = "true"
+        opts_js = "{" + ", ".join(f"{k}: {v}" for k, v in opts.items()) + "}" if opts else "{}"
+        if self.asset_id == 1:
+            # createWorldTerrainAsync is the async equivalent of the world
+            # terrain asset (asset id 1).
+            return f"Cesium.createWorldTerrainAsync({opts_js})"
+        return f"Cesium.CesiumTerrainProvider.fromIonAssetId({self.asset_id}, {opts_js})"
 
 
 class _ImageHeightmapTerrainProvider(TerrainProvider):

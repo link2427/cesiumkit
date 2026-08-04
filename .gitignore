@@ -8,3 +8,6 @@ build/
 .pytest_cache/
 *.egg
 site/
+# Bundled Cesium build, fetched by scripts/fetch_cesium.py (vendor/.gitkeep
+# stays committed so the packaging force-include always has a valid path)
+cesiumkit/vendor/cesium/

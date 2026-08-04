@@ -42,6 +42,7 @@ jobs:
         with:
           python-version: "3.13"
       - run: pip install ".[dev,gis,raster,datashader,widget]" playwright
+      - run: python -m playwright install chromium --with-deps
       - run: pytest --doctest-modules cesiumkit tests -q
 
   # Bundled-build tests (offline serving) need the ~120 MiB Cesium release,

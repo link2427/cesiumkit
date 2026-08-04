@@ -8,11 +8,13 @@ cesiumkit gives you a Pythonic, object-oriented API for [CesiumJS](https://cesiu
 import cesiumkit
 
 viewer = cesiumkit.Viewer(title="Hello Globe")
-viewer.add_entity(cesiumkit.Entity(
-    name="New York",
-    position=cesiumkit.Cartesian3.from_degrees(-74.006, 40.7128, 400),
-    point=cesiumkit.PointGraphics(pixel_size=12, color=cesiumkit.Color.RED),
-))
+viewer.add_entity(
+    cesiumkit.Entity(
+        name="New York",
+        position=cesiumkit.Cartesian3.from_degrees(-74.006, 40.7128, 400),
+        point=cesiumkit.PointGraphics(pixel_size=12, color=cesiumkit.Color.RED),
+    )
+)
 viewer.show()  # opens in your browser
 ```
 

@@ -41,7 +41,7 @@ viewer.add_geodataframe(
     gdf,
     name_column="NAME",
     description_column="DESCRIPTION",
-    color_column="color_hex",           # e.g. "#ff8800" per row
+    color_column="color_hex",  # e.g. "#ff8800" per row
     fill_alpha=0.4,
     stroke=cesiumkit.Color.WHITE,
     stroke_width=2,
@@ -79,18 +79,22 @@ Pydantic validators auto-convert them:
 from shapely.geometry import Point, Polygon
 import cesiumkit
 
-viewer.add_entity(cesiumkit.Entity(
-    name="HQ",
-    position=Point(-74.006, 40.7128),  # shapely Point → Cartesian3
-))
+viewer.add_entity(
+    cesiumkit.Entity(
+        name="HQ",
+        position=Point(-74.006, 40.7128),  # shapely Point → Cartesian3
+    )
+)
 
-viewer.add_entity(cesiumkit.Entity(
-    name="Site",
-    polygon=cesiumkit.PolygonGraphics(
-        hierarchy=Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]),  # Polygon → hierarchy
-        material=cesiumkit.Color.CORNFLOWERBLUE.with_alpha(0.6),
-    ),
-))
+viewer.add_entity(
+    cesiumkit.Entity(
+        name="Site",
+        polygon=cesiumkit.PolygonGraphics(
+            hierarchy=Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]),  # Polygon → hierarchy
+            material=cesiumkit.Color.CORNFLOWERBLUE.with_alpha(0.6),
+        ),
+    )
+)
 ```
 
 Shapely is CRS-naive, so cesiumkit assumes the coordinates are WGS84 lon/lat.

@@ -119,8 +119,10 @@ The Viewer class is a plain Python class (not Pydantic) because it manages mutab
 ```python
 from cesiumkit.entities._base import EntityGraphics
 
+
 class MyTypeGraphics(EntityGraphics):
     """Cesium MyType graphics."""
+
     some_field: float = 1.0
     # ... fields matching CesiumJS constructor options
 

@@ -50,15 +50,19 @@ Replace the first matching CZML or GeoJSON source with a URL or an in-memory
 JSON-compatible value:
 
 ```python
-viewer.update_czml([
-    {"id": "document", "version": "1.0"},
-    {"id": "vehicle", "position": {"cartographicDegrees": [-87.63, 41.88, 0]}},
-])
+viewer.update_czml(
+    [
+        {"id": "document", "version": "1.0"},
+        {"id": "vehicle", "position": {"cartographicDegrees": [-87.63, 41.88, 0]}},
+    ]
+)
 
-viewer.update_geojson({
-    "type": "FeatureCollection",
-    "features": [],
-})
+viewer.update_geojson(
+    {
+        "type": "FeatureCollection",
+        "features": [],
+    }
+)
 ```
 
 For browser-side polling, keep the returned ID so the poller can be stopped:

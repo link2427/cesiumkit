@@ -151,3 +151,12 @@ class SceneConfig(CesiumBase):
         if self.post_process is not None:
             statements.extend(self.post_process.to_js_statements(viewer_var))
         return statements
+
+
+__all__ = [
+    "AmbientOcclusionConfig",
+    "BloomConfig",
+    "FXAAConfig",
+    "PostProcessConfig",
+    "SceneConfig",
+]

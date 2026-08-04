@@ -14,9 +14,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - run: pip install "ruff==0.16.1"
+      - run: pip install ruff vulture
       - run: ruff check .
       - run: ruff format --check .
+      - run: vulture cesiumkit --min-confidence 100
 
   test:
     runs-on: ubuntu-latest

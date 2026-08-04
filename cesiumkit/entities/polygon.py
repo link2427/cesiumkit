@@ -99,3 +99,9 @@ class PolygonGraphics(EntityGraphics):
         if not parts:
             return "{}"
         return "{\n        " + ",\n        ".join(parts) + "\n    }"
+
+
+__all__ = [
+    "PolygonGraphics",
+    "PolygonHierarchy",
+]

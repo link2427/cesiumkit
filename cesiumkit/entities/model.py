@@ -27,3 +27,8 @@ class ModelGraphics(EntityGraphics):
 
     def _graphics_key(self) -> str:
         return "model"
+
+
+__all__ = [
+    "ModelGraphics",
+]

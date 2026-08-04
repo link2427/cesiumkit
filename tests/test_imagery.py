@@ -1,5 +1,8 @@
 """Tests for cesiumkit.imagery module."""
 
+import pytest
+from pydantic import ValidationError
+
 from cesiumkit.imagery import (
     BingMapsImageryProvider,
     IonImageryProvider,
@@ -24,6 +27,10 @@ class TestBingMapsImageryProvider:
         js = p.to_js()
         assert "BingMapsImageryProvider" in js
         assert "my_key" in js
+
+    def test_key_required(self):
+        with pytest.raises(ValidationError):
+            BingMapsImageryProvider()
 
 
 class TestOpenStreetMapImageryProvider:

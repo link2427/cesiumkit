@@ -28,3 +28,8 @@ class CorridorGraphics(EntityGraphics):
 
     def _graphics_key(self) -> str:
         return "corridor"
+
+
+__all__ = [
+    "CorridorGraphics",
+]

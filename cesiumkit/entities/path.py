@@ -19,3 +19,8 @@ class PathGraphics(EntityGraphics):
 
     def _graphics_key(self) -> str:
         return "path"
+
+
+__all__ = [
+    "PathGraphics",
+]

@@ -30,3 +30,8 @@ class LabelGraphics(EntityGraphics):
 
     def _graphics_key(self) -> str:
         return "label"
+
+
+__all__ = [
+    "LabelGraphics",
+]

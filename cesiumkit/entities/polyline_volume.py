@@ -24,3 +24,8 @@ class PolylineVolumeGraphics(EntityGraphics):
 
     def _graphics_key(self) -> str:
         return "polylineVolume"
+
+
+__all__ = [
+    "PolylineVolumeGraphics",
+]

@@ -58,3 +58,8 @@ class ParticleSystem(CesiumBase):
 
     def _js_class_name(self) -> str:
         return "Cesium.ParticleSystem"
+
+
+__all__ = [
+    "ParticleSystem",
+]

@@ -99,6 +99,23 @@ class TestFullHtmlOutput:
         assert html.count("dataSources.add") == 2
         assert "primitives.add" in html
 
+    def test_custom_data_source_with_entities(self):
+        ds = cesiumkit.CustomDataSource(name="my_sources")
+        ds.entities.add(
+            cesiumkit.Entity(
+                name="Custom",
+                position=cesiumkit.Cartesian3.from_degrees(-75, 40, 100),
+                point=cesiumkit.PointGraphics(pixel_size=5),
+            )
+        )
+        viewer = cesiumkit.Viewer()
+        viewer.add_data_source(ds)
+        html = viewer.to_html()
+        assert 'const _ds0 = new Cesium.CustomDataSource("my_sources");' in html
+        assert "viewer.dataSources.add(_ds0);" in html
+        assert "_ds0.entities.add(" in html
+        assert '"Custom"' in html
+
     def test_scene_with_globe_config(self):
         viewer = cesiumkit.Viewer(
             globe=cesiumkit.GlobeConfig(
@@ -109,6 +126,11 @@ class TestFullHtmlOutput:
         html = viewer.to_html()
         assert "enableLighting = true" in html
         assert "depthTestAgainstTerrain = true" in html
+
+    def test_show_sky_atmosphere_emitted(self):
+        viewer = cesiumkit.Viewer(globe=cesiumkit.GlobeConfig(show_sky_atmosphere=False))
+        html = viewer.to_html()
+        assert "scene.skyAtmosphere.show = false" in html
 
     def test_scene_with_terrain_exaggeration(self):
         viewer = cesiumkit.Viewer(

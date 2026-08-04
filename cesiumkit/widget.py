@@ -93,8 +93,12 @@ async function render({ model, el }) {
     for (const entityJs of state.entities || []) {
         viewer.entities.add(eval(entityJs));
     }
-    for (const dsJs of state.dataSources || []) {
-        viewer.dataSources.add(eval(dsJs));
+    for (let i = 0; i < (state.dataSources || []).length; i++) {
+        const ds = eval(state.dataSources[i]);
+        viewer.dataSources.add(ds);
+        for (const stmt of (state.dataSourceEntityStatements || [])[i] || []) {
+            eval(stmt);
+        }
     }
     for (const tilesetJs of state.tilesets || []) {
         (async () => {
@@ -197,6 +201,7 @@ class CesiumKitWidget(anywidget.AnyWidget):
             raise TimeoutError(f"widget command timed out: {js[:80]}")
 
     def _handle_msg(self, widget: Any, content: dict[str, Any], buffers: list[bytes]) -> None:
+        del widget, buffers  # anywidget callback signature; unused by the handler
         msg_type = content.get("type")
         if msg_type == "result":
             request_id = content.get("requestId")
@@ -243,3 +248,8 @@ class CesiumKitWidget(anywidget.AnyWidget):
             "(function(){const canvas = viewer.scene.canvas;return canvas.toDataURL('image/png').split(',')[1];})()"
         )
         Path(path).write_bytes(base64.b64decode(data_url))
+
+
+__all__ = [
+    "CesiumKitWidget",
+]

@@ -760,6 +760,21 @@ class Viewer:
         """Build JS expressions for all data sources."""
         return [ds.to_js() for ds in self._data_sources]
 
+    def _build_data_source_entity_statements(self) -> list[list[str]]:
+        """Build per-data-source entity attachment statements.
+
+        Entries are JS statements of the form `_ds<i>.entities.add(...)`
+        referencing the data-source variable created in the template loop.
+        """
+        statements: list[list[str]] = []
+        for index, ds in enumerate(self._data_sources):
+            ds_statements: list[str] = []
+            entities = getattr(ds, "entities", None)
+            for entity in getattr(entities, "_entities", []):
+                ds_statements.append(f"_ds{index}.entities.add({entity.to_js()});")
+            statements.append(ds_statements)
+        return statements
+
     def _build_tileset_js_list(self) -> list[str]:
         """Build JS expressions for all tilesets."""
         return [ts.to_js() for ts in self._tilesets]
@@ -817,6 +832,7 @@ class Viewer:
             "viewer_options": self._build_viewer_options_js(),
             "entities": self._build_entity_js_list(),
             "data_sources": self._build_data_source_js_list(),
+            "data_source_entity_statements": self._build_data_source_entity_statements(),
             "tilesets": self._build_tileset_js_list(),
             "primitives": self._build_primitive_js_list(),
             "camera_operations": self._build_camera_operations(),
@@ -849,6 +865,7 @@ class Viewer:
             viewer_options=self._build_viewer_options_js(),
             entities=self._build_entity_js_list(),
             data_sources=self._build_data_source_js_list(),
+            data_source_entity_statements=self._build_data_source_entity_statements(),
             tilesets=self._build_tileset_js_list(),
             primitives=self._build_primitive_js_list(),
             camera_operations=self._build_camera_operations(),
@@ -1080,3 +1097,8 @@ class Viewer:
         """Save CZML to a .czml file."""
         with open(path, "w", encoding="utf-8") as f:
             f.write(self.to_czml_string())
+
+
+__all__ = [
+    "Viewer",
+]

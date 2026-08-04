@@ -13,3 +13,8 @@ class Cesium3DTilesetGraphics(EntityGraphics):
 
     def _graphics_key(self) -> str:
         return "tileset"
+
+
+__all__ = [
+    "Cesium3DTilesetGraphics",
+]

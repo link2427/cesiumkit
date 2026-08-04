@@ -42,3 +42,9 @@ class PlaneGraphics(EntityGraphics):
 
     def _graphics_key(self) -> str:
         return "plane"
+
+
+__all__ = [
+    "Plane",
+    "PlaneGraphics",
+]

@@ -5,8 +5,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from pydantic import Field
+
 from cesiumkit._js_serializer import to_js_value
 from cesiumkit.base import CesiumBase
+from cesiumkit.entities._base import EntityCollection
 
 
 class DataSource(CesiumBase):
@@ -105,7 +108,7 @@ class GeoJsonDataSource(DataSource):
 class KmlDataSource(DataSource):
     """Load KML/KMZ data."""
 
-    url: str = ""
+    url: str
     clamp_to_ground: bool = False
 
     def _js_class_name(self) -> str:
@@ -127,6 +130,8 @@ class KmlDataSource(DataSource):
 class CustomDataSource(DataSource):
     """A custom data source with manually managed entities."""
 
+    entities: EntityCollection = Field(default_factory=EntityCollection)
+
     def _js_class_name(self) -> str:
         return "Cesium.CustomDataSource"
 
@@ -134,3 +139,12 @@ class CustomDataSource(DataSource):
         if self.name:
             return f'new Cesium.CustomDataSource("{self.name}")'
         return "new Cesium.CustomDataSource()"
+
+
+__all__ = [
+    "CustomDataSource",
+    "CzmlDataSource",
+    "DataSource",
+    "GeoJsonDataSource",
+    "KmlDataSource",
+]

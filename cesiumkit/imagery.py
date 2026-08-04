@@ -29,7 +29,7 @@ class BingMapsImageryProvider(ImageryProvider):
     """Provides imagery from Bing Maps."""
 
     url: str = "https://dev.virtualearth.net"
-    key: str = ""
+    key: str
     map_style: str = "Aerial"
 
     def _js_class_name(self) -> str:
@@ -103,3 +103,16 @@ class SingleTileImageryProvider(ImageryProvider):
 
     def _js_class_name(self) -> str:
         return "Cesium.SingleTileImageryProvider"
+
+
+__all__ = [
+    "BingMapsImageryProvider",
+    "ImageryProvider",
+    "IonImageryProvider",
+    "OpenStreetMapImageryProvider",
+    "SingleTileImageryProvider",
+    "TileMapServiceImageryProvider",
+    "UrlTemplateImageryProvider",
+    "WebMapServiceImageryProvider",
+    "WebMapTileServiceImageryProvider",
+]

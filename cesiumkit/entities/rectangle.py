@@ -28,3 +28,8 @@ class RectangleGraphics(EntityGraphics):
 
     def _graphics_key(self) -> str:
         return "rectangle"
+
+
+__all__ = [
+    "RectangleGraphics",
+]

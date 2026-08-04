@@ -30,3 +30,8 @@ class BillboardGraphics(EntityGraphics):
 
     def _graphics_key(self) -> str:
         return "billboard"
+
+
+__all__ = [
+    "BillboardGraphics",
+]

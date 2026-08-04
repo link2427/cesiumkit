@@ -99,3 +99,13 @@ class Matrix4(CesiumBase):
     def to_js(self) -> str:
         vals = ", ".join(str(v) for v in self.values)
         return f"new Cesium.Matrix4({vals})"
+
+
+__all__ = [
+    "HeadingPitchRange",
+    "HeadingPitchRoll",
+    "HeadingPitchRollFromDegrees",
+    "Matrix3",
+    "Matrix4",
+    "Quaternion",
+]

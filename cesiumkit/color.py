@@ -33,10 +33,10 @@ class Color(CesiumBase):
     def to_czml(self) -> dict:
         return {
             "rgba": [
-                int(self.red * 255),
-                int(self.green * 255),
-                int(self.blue * 255),
-                int(self.alpha * 255),
+                round(self.red * 255),
+                round(self.green * 255),
+                round(self.blue * 255),
+                round(self.alpha * 255),
             ]
         }
 

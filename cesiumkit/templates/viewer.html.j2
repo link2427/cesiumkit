@@ -96,10 +96,7 @@
         {% for ds_js in data_sources %}
         var _ds = {{ ds_js }};
         viewer.dataSources.add(_ds);
-        {% endfor %}
-
-        {% for ds_statements in data_source_entity_statements %}
-        {% for stmt in ds_statements %}
+        {% for stmt in data_source_entity_statements[loop.index0] %}
         {{ stmt }}
         {% endfor %}
         {% endfor %}

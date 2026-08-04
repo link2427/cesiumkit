@@ -116,6 +116,27 @@ class TestFullHtmlOutput:
         assert "_ds.entities.add(" in html
         assert '"Custom"' in html
 
+    def test_multiple_custom_data_sources_attach_to_their_own(self):
+        """Each source's entity statement must run before the next source is declared."""
+        viewer = cesiumkit.Viewer()
+        for name, entity_name in (("source_a", "EntityA"), ("source_b", "EntityB")):
+            ds = cesiumkit.CustomDataSource(name=name)
+            ds.entities.add(
+                cesiumkit.Entity(
+                    name=entity_name,
+                    position=cesiumkit.Cartesian3.from_degrees(-75, 40, 100),
+                    point=cesiumkit.PointGraphics(pixel_size=5),
+                )
+            )
+            viewer.add_data_source(ds)
+        html = viewer.to_html()
+        assert html.count("var _ds = new Cesium.CustomDataSource(") == 2
+        entity_a = html.index('"EntityA"')
+        source_b_decl = html.index('var _ds = new Cesium.CustomDataSource("source_b")')
+        entity_b = html.index('"EntityB"')
+        assert entity_a < source_b_decl, "EntityA attached after source_b was declared"
+        assert source_b_decl < entity_b, "EntityB attached before source_b was declared"
+
     def test_scene_with_globe_config(self):
         viewer = cesiumkit.Viewer(
             globe=cesiumkit.GlobeConfig(

@@ -771,7 +771,7 @@ class Viewer:
         for ds in self._data_sources:
             ds_statements: list[str] = []
             entities = getattr(ds, "entities", None)
-            for entity in getattr(entities, "_entities", []):
+            for entity in entities or []:
                 ds_statements.append(f"_ds.entities.add({entity.to_js()});")
             statements.append(ds_statements)
         return statements

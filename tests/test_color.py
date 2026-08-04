@@ -43,6 +43,10 @@ class TestColor:
         czml = RED.to_czml()
         assert czml == {"rgba": [255, 0, 0, 255]}
 
+    def test_to_czml_rounds_channels(self):
+        czml = Color(red=0.5, green=0.5, blue=0.5, alpha=0.5).to_czml()
+        assert czml == {"rgba": [128, 128, 128, 128]}
+
     def test_class_level_constants(self):
         assert cesiumkit.Color.RED.to_js() == "Cesium.Color.RED"
         assert cesiumkit.Color.BLUE.to_js() == "Cesium.Color.BLUE"

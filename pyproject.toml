@@ -73,9 +73,11 @@ Issues = "https://github.com/link2427/cesiumkit/issues"
 # to the CDN.
 [tool.hatch.build.targets.wheel]
 packages = ["cesiumkit"]
+exclude = ["cesiumkit/vendor/.gitkeep"]
 force-include = { "cesiumkit/vendor" = "cesiumkit/vendor" }
 
 [tool.hatch.build.targets.sdist]
+exclude = ["cesiumkit/vendor/.gitkeep"]
 force-include = { "cesiumkit/vendor" = "cesiumkit/vendor" }
 
 [tool.pytest.ini_options]

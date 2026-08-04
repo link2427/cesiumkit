@@ -83,6 +83,22 @@ class Camera:
         self._operations.append(("lookAt", {"target": target, "offset": offset}))
         return self
 
+    def fly_to_entities(self, duration: float = 3.0) -> Camera:
+        """Queue a flyTo that fits the camera to the extent of all entities.
+
+        Emits ``viewer.flyTo(viewer.entities, {...})``; the globe animates to
+        a view containing every entity currently in the scene.
+        """
+        self._operations.append(("flyToEntities", {"duration": duration}))
+        return self
+
+    def fly_to_bounding_sphere(self, bounding_sphere: Any, duration: float = 3.0, **kwargs: Any) -> Camera:
+        """Queue a flyToBoundingSphere operation."""
+        opts: dict[str, Any] = {"boundingSphere": bounding_sphere, "duration": duration}
+        opts.update(kwargs)
+        self._operations.append(("flyToBoundingSphere", opts))
+        return self
+
     def zoom_in(self, amount: float | None = None) -> Camera:
         """Queue a zoomIn operation."""
         self._operations.append(("zoomIn", {"amount": amount}))
@@ -111,6 +127,14 @@ class Camera:
                 target_js = to_js_value(opts["target"])
                 offset_js = to_js_value(opts["offset"])
                 statements.append(f"{viewer_var}.camera.lookAt({target_js}, {offset_js});")
+            elif method == "flyToEntities":
+                opts_js = to_js_options(opts, exclude_none=True)
+                statements.append(f"{viewer_var}.flyTo({viewer_var}.entities, {opts_js});")
+            elif method == "flyToBoundingSphere":
+                target_js = to_js_value(opts["boundingSphere"])
+                fly_opts = {k: v for k, v in opts.items() if k != "boundingSphere"}
+                opts_js = to_js_options(fly_opts, exclude_none=True)
+                statements.append(f"{viewer_var}.camera.flyToBoundingSphere({target_js}, {opts_js});")
             elif method in ("zoomIn", "zoomOut"):
                 amount = opts.get("amount")
                 if amount is not None:

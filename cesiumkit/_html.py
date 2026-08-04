@@ -61,6 +61,7 @@ class HtmlDocument:
         scene_statements: list[str] | None = None,
         globe_statements: list[str] | None = None,
         clock_statements: list[str] | None = None,
+        clustering_statements: list[str] | None = None,
         terrain_statement: str | None = None,
         custom_scripts: list[str] | None = None,
     ) -> str:
@@ -84,6 +85,7 @@ class HtmlDocument:
             scene_statements=scene_statements or [],
             globe_statements=globe_statements or [],
             clock_statements=clock_statements or [],
+            clustering_statements=clustering_statements or [],
             terrain_statement=terrain_statement,
             custom_scripts=custom_scripts or [],
         )

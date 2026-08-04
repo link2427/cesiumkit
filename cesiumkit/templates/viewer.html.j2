@@ -73,6 +73,10 @@
         })();
         {% endif %}
 
+        {% for stmt in clustering_statements %}
+        {{ stmt }}
+        {% endfor %}
+
         {% for stmt in scene_statements %}
         {{ stmt }}
         {% endfor %}

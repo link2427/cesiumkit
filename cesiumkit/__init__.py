@@ -41,6 +41,9 @@ from cesiumkit.camera import Camera, CameraPosition, FlyToOptions, LookAtOptions
 # Time & Properties
 from cesiumkit.clock import ClockConfig, JulianDate
 
+# Clustering
+from cesiumkit.clustering import EntityClusterConfig
+
 # CZML
 from cesiumkit.czml import CzmlDocument
 
@@ -109,7 +112,7 @@ from cesiumkit.imagery import (
 )
 
 # Ion
-from cesiumkit.ion import Cesium3DTileset, Ion, IonResource
+from cesiumkit.ion import Cesium3DTileset, Cesium3DTileStyle, Ion, IonResource
 
 # Materials
 from cesiumkit.material import (
@@ -290,6 +293,9 @@ __all__ = [
     "Ion",
     "IonResource",
     "Cesium3DTileset",
+    "Cesium3DTileStyle",
+    # Clustering
+    "EntityClusterConfig",
     # Events
     "EventHandler",
     # CZML

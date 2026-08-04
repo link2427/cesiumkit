@@ -69,6 +69,7 @@ nav:
       - Color: api/color.md
       - Materials: api/materials.md
       - Camera: api/camera.md
+      - Clustering: api/clustering.md
       - Properties: api/properties.md
       - Data Sources: api/datasources.md
       - Imagery Providers: api/imagery.md

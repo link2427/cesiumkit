@@ -22,12 +22,15 @@ jobs:
       # Pull the latest gallery screenshots from the gallery-images branch
       # so they're included in the built docs site. The gallery branch is
       # populated by .github/workflows/gallery.yml (manual / on release).
+      # The explicit refspec matters: a plain `git fetch origin branch`
+      # only writes FETCH_HEAD, and on a fresh runner the
+      # origin/gallery-images tracking ref does not exist, so the checkout
+      # below would fail and the site would ship with no gallery images.
       - name: Fetch gallery images
         run: |
           mkdir -p docs/images/gallery
-          if git fetch origin gallery-images 2>/dev/null; then
-            git show origin/gallery-images:docs/images/gallery 2>/dev/null | true
-            git --work-tree=. checkout origin/gallery-images -- docs/images/gallery 2>/dev/null || echo "No gallery images yet"
+          if git fetch origin gallery-images:refs/remotes/origin/gallery-images 2>/dev/null; then
+            git checkout origin/gallery-images -- docs/images/gallery || echo "No gallery images yet"
           else
             echo "gallery-images branch does not exist yet — skipping"
           fi

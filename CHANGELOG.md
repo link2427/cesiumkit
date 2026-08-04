@@ -4,6 +4,33 @@ All notable changes to cesiumkit are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-08-04
+
+### Added
+
+- **Bundled offline Cesium build.** `scripts/fetch_cesium.py` downloads the
+  official CesiumJS release into the package; when present, `show()` serves
+  Cesium.js and the NaturalEarthII fallback imagery locally, so viewers work
+  fully offline and in air-gapped environments. The publish workflow fetches
+  it before building, so the wheel ships with offline support.
+- **Headless render smoke test.** `scripts/smoke_render.py` loads a viewer in
+  headless Chromium (playwright) and verifies the globe initializes and
+  renders, for CI/headless environments.
+
+### Changed
+
+- **CesiumJS upgraded from 1.119 to 1.144.** The imagery provider is now
+  passed to the Viewer as `baseLayer` wrapped in an `ImageryLayer` (the old
+  `imageryProvider` option was removed in Cesium 1.144), and terrain
+  providers are assigned to `scene.terrainProvider` after construction via
+  their async factory methods (`CesiumTerrainProvider.fromUrl`,
+  `createWorldTerrainAsync`).
+- `IonTerrainProvider.asset_id` is now honored: non-default asset ids emit
+  `CesiumTerrainProvider.fromIonAssetId(...)` instead of always using world
+  terrain.
+- Static HTML export (`to_html()`/`save()`) and Jupyter embedding still load
+  Cesium from the CDN; only `show()` serves the bundled build.
+
 ## [0.3.0] - 2026-07-14
 
 ### Added

@@ -30,3 +30,16 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: pip install ".[dev]"
       - run: pytest --cov=cesiumkit
+
+  # Bundled-build tests (offline serving) need the ~120 MiB Cesium release,
+  # so they run in their own job instead of every matrix entry.
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install ".[dev]"
+      - run: python scripts/fetch_cesium.py
+      - run: pytest tests/test_offline.py

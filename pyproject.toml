@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cesiumkit"
-version = "0.3.0"
+version = "0.4.0"
 description = "Object-oriented Python interface for CesiumJS 3D geospatial visualization"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -66,6 +66,17 @@ Homepage = "https://github.com/link2427/cesiumkit"
 Documentation = "https://link2427.github.io/cesiumkit"
 Repository = "https://github.com/link2427/cesiumkit"
 Issues = "https://github.com/link2427/cesiumkit/issues"
+
+# The vendored Cesium build (cesiumkit/vendor/) is fetched by
+# scripts/fetch_cesium.py; the publish workflow runs it before building so
+# the wheel ships with offline support. When absent, cesiumkit falls back
+# to the CDN.
+[tool.hatch.build.targets.wheel]
+packages = ["cesiumkit"]
+force-include = { "cesiumkit/vendor" = "cesiumkit/vendor" }
+
+[tool.hatch.build.targets.sdist]
+force-include = { "cesiumkit/vendor" = "cesiumkit/vendor" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

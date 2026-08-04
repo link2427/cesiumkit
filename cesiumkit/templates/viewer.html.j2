@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <title>{{ title }}</title>
-    <script src="https://cesium.com/downloads/cesiumjs/releases/{{ cesium_version }}/Build/Cesium/Cesium.js"></script>
-    <link href="https://cesium.com/downloads/cesiumjs/releases/{{ cesium_version }}/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <script src="{{ cesium_js_url }}"></script>
+    <link href="{{ cesium_css_url }}" rel="stylesheet">
     <style>
         html, body, #{{ container_id }} {
             width: {{ width }};
@@ -59,6 +59,19 @@
             viewer.infoBox.frame.removeAttribute('sandbox');
             viewer.infoBox.frame.src = 'about:blank';
         }
+
+        {% if terrain_statement %}
+        // Terrain providers are resolved asynchronously in Cesium 1.10x+;
+        // assign after construction rather than passing a Promise to the
+        // viewer options.
+        (async () => {
+            try {
+                viewer.scene.terrainProvider = {{ terrain_statement }};
+            } catch (error) {
+                console.error('Error loading terrain:', error);
+            }
+        })();
+        {% endif %}
 
         {% for stmt in scene_statements %}
         {{ stmt }}

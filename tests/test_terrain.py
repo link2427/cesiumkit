@@ -22,7 +22,17 @@ class TestCesiumTerrainProvider:
     def test_to_js(self):
         p = CesiumTerrainProvider(url="https://assets.cesium.com/1")
         js = p.to_js()
-        assert "CesiumTerrainProvider" in js
+        assert "CesiumTerrainProvider.fromUrl" in js
+        assert "https://assets.cesium.com/1" in js
+
+    def test_to_js_with_options(self):
+        js = CesiumTerrainProvider(
+            url="https://assets.cesium.com/1",
+            request_vertex_normals=True,
+            request_water_mask=True,
+        ).to_js()
+        assert "requestVertexNormals: true" in js
+        assert "requestWaterMask: true" in js
 
 
 class TestIonTerrainProvider:
@@ -37,6 +47,12 @@ class TestIonTerrainProvider:
         assert "createWorldTerrainAsync" in js
         assert "requestVertexNormals" in js
         assert "requestWaterMask" in js
+
+    def test_custom_asset_uses_from_ion_asset_id(self):
+        p = IonTerrainProvider(asset_id=75343)
+        js = p.to_js()
+        assert "CesiumTerrainProvider.fromIonAssetId(75343" in js
+        assert "createWorldTerrainAsync" not in js
 
 
 class TestWmsTerrainProvider:

@@ -206,3 +206,11 @@ class TestFullHtmlOutput:
         assert "SampledPositionProperty" in html
         assert "addSample" in html
         assert "trailTime" in html
+
+    def test_no_deprecated_cesium_apis(self):
+        """Generated HTML must only use Cesium 1.144-era APIs."""
+        viewer = cesiumkit.Viewer(ion_token="tok")
+        html = viewer.to_html()
+        assert "imageryProvider:" not in html
+        assert "new Cesium.CesiumTerrainProvider({" not in html
+        assert "1.119" not in html

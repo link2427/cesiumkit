@@ -1,6 +1,6 @@
 # GeoDataFrame to globe in 3 lines
 
-cesiumkit v0.2.0 adds native support for [GeoPandas](https://geopandas.org)
+cesiumkit adds native support for [GeoPandas](https://geopandas.org)
 and [Shapely](https://shapely.readthedocs.io). If you have a `GeoDataFrame`,
 you can drop it on the globe with a single call.
 

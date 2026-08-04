@@ -54,6 +54,20 @@ Many features work without a token (using bundled offline imagery). For full fun
 cesiumkit.Ion.set_default_token("your-token-here")
 ```
 
+## Offline use
+
+By default pages load CesiumJS from the CDN. To run fully offline (air-gapped
+machines, CI, headless servers), vendor the Cesium build once and `show()`
+will serve it locally, including the NaturalEarthII fallback imagery:
+
+```bash
+python scripts/fetch_cesium.py
+```
+
+The wheel published to PyPI includes the vendored build, so `pip install
+cesiumkit` works offline out of the box after the 0.4.0 release. Static HTML
+export and Jupyter embedding still load from the CDN.
+
 ## What's next?
 
 - Browse the [Examples](examples.md) for common patterns

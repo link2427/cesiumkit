@@ -28,3 +28,8 @@ class EventHandler(CesiumBase):
             f".setInputAction({handler_code}, "
             f"Cesium.ScreenSpaceEventType.{self.event_type.value})"
         )
+
+
+__all__ = [
+    "EventHandler",
+]

@@ -30,3 +30,8 @@ class EllipseGraphics(EntityGraphics):
 
     def _graphics_key(self) -> str:
         return "ellipse"
+
+
+__all__ = [
+    "EllipseGraphics",
+]

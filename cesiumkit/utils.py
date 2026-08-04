@@ -29,3 +29,9 @@ class JsCode:
 def generate_id() -> str:
     """Generate a unique identifier."""
     return str(uuid4())
+
+
+__all__ = [
+    "JsCode",
+    "generate_id",
+]

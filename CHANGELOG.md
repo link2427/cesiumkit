@@ -4,6 +4,35 @@ All notable changes to cesiumkit are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] - 2026-08-04
+
+### Added
+
+- **Public API audit.** Every module now declares its public surface via
+  `__all__`; a CI test enforces that all public names are listed and resolve.
+- **CustomDataSource entities.** Attach Python entities to a custom data
+  source with `ds.entities.add(...)`; they emit as `ds.entities.add(...)`
+  after the data source is added to the viewer (HTML and Jupyter widget).
+- `GlobeConfig.show_sky_atmosphere` now controls
+  `scene.skyAtmosphere.show` (previously declared but never emitted).
+- CI-status badge in the README; a Vulture dead-code gate in the lint job.
+
+### Changed
+
+- `BingMapsImageryProvider.key` and `KmlDataSource.url` are now required
+  fields; the old `""` defaults produced providers that always failed.
+- Packaging per PEP 639: explicit `license-files`, the deprecated
+  `License :: OSI Approved :: MIT License` classifier removed, hatchling
+  pinned to `>=1.26`.
+- Publish workflow validates artifacts before upload: `twine check` plus a
+  fresh-venv sdist install smoke test (import + vendored Cesium present).
+- API reference pages added for the `math`, `particle`, and `testing`
+  modules.
+
+### Fixed
+
+- Dead code in the widget command handler (unused callback parameters).
+
 ## [0.5.0] - 2026-08-04
 
 ### Added

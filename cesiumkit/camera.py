@@ -147,3 +147,11 @@ class Camera:
                 statements.append(f"{viewer_var}.camera.{method}({opts_js});")
 
         return statements
+
+
+__all__ = [
+    "Camera",
+    "CameraPosition",
+    "FlyToOptions",
+    "LookAtOptions",
+]

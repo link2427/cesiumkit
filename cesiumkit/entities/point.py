@@ -22,3 +22,8 @@ class PointGraphics(EntityGraphics):
 
     def _graphics_key(self) -> str:
         return "point"
+
+
+__all__ = [
+    "PointGraphics",
+]

@@ -16,7 +16,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - run: pip install build
+      - run: pip install build twine
       - run: python scripts/fetch_cesium.py
       - run: python -m build
+      - run: twine check dist/*
+      - name: Smoke-test the sdist in a fresh venv
+        run: |
+          python -m venv /tmp/sdist-venv
+          /tmp/sdist-venv/bin/pip install --quiet dist/*.tar.gz
+          /tmp/sdist-venv/bin/python -c "import cesiumkit; import cesiumkit._vendor as v; assert v.vendor_dir() is not None, 'vendored Cesium missing from sdist'; print('sdist OK:', cesiumkit.__version__)"
       - uses: pypa/gh-action-pypi-publish@release/v1

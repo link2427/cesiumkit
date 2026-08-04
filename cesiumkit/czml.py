@@ -50,3 +50,8 @@ class CzmlDocument:
         """Save the CZML document to a file."""
         with open(path, "w", encoding="utf-8") as f:
             f.write(self.to_json())
+
+
+__all__ = [
+    "CzmlDocument",
+]

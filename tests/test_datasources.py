@@ -1,5 +1,8 @@
 """Tests for cesiumkit.datasources module."""
 
+import pytest
+from pydantic import ValidationError
+
 from cesiumkit.color import RED
 from cesiumkit.datasources import (
     CustomDataSource,
@@ -49,6 +52,10 @@ class TestKmlDataSource:
         js = ds.to_js()
         assert "KmlDataSource.load" in js
         assert "example.com/data.kml" in js
+
+    def test_url_required(self):
+        with pytest.raises(ValidationError):
+            KmlDataSource()
 
 
 class TestCustomDataSource:

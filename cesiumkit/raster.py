@@ -126,3 +126,9 @@ def aggregate_points_to_raster(
     ) as dst:
         dst.write(pixels.transpose(2, 0, 1))
     return path
+
+
+__all__ = [
+    "RasterSource",
+    "aggregate_points_to_raster",
+]

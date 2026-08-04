@@ -22,3 +22,8 @@ class BoxGraphics(EntityGraphics):
 
     def _graphics_key(self) -> str:
         return "box"
+
+
+__all__ = [
+    "BoxGraphics",
+]

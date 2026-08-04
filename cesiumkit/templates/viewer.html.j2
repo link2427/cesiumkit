@@ -94,7 +94,11 @@
         {% endfor %}
 
         {% for ds_js in data_sources %}
-        viewer.dataSources.add({{ ds_js }});
+        var _ds = {{ ds_js }};
+        viewer.dataSources.add(_ds);
+        {% for stmt in data_source_entity_statements[loop.index0] %}
+        {{ stmt }}
+        {% endfor %}
         {% endfor %}
 
         {% for tileset_js in tilesets %}

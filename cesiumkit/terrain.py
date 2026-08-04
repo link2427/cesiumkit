@@ -204,3 +204,13 @@ class WmtsTerrainProvider(_ImageHeightmapTerrainProvider):
         )
         scheme = "GeographicTilingScheme" if self.tiling_scheme == "geographic" else "WebMercatorTilingScheme"
         return self._custom_provider_js(request_url_js, tiling_scheme=scheme)
+
+
+__all__ = [
+    "CesiumTerrainProvider",
+    "EllipsoidTerrainProvider",
+    "IonTerrainProvider",
+    "TerrainProvider",
+    "WmsTerrainProvider",
+    "WmtsTerrainProvider",
+]

@@ -3,6 +3,7 @@
 **Build CesiumJS 3D globe visualizations entirely in Python.**
 
 [![Docs](https://img.shields.io/badge/docs-link2427.github.io%2Fcesiumkit-blue)](https://link2427.github.io/cesiumkit)
+[![CI](https://github.com/link2427/cesiumkit/actions/workflows/ci.yml/badge.svg)](https://github.com/link2427/cesiumkit/actions/workflows/ci.yml)
 [![Coverage](https://link2427.github.io/cesiumkit/coverage.svg)](https://link2427.github.io/cesiumkit)
 [![PyPI version](https://img.shields.io/pypi/v/cesiumkit.svg)](https://pypi.org/project/cesiumkit/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)

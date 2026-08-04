@@ -760,6 +760,22 @@ class Viewer:
         """Build JS expressions for all data sources."""
         return [ds.to_js() for ds in self._data_sources]
 
+    def _build_data_source_entity_statements(self) -> list[list[str]]:
+        """Build per-data-source entity attachment statements.
+
+        Statements reference ``_ds``, a variable both the HTML template and
+        the widget ESM declare per data source. Referencing the object (not
+        ``dataSources.get(i)``) sidesteps Cesium's async collection add.
+        """
+        statements: list[list[str]] = []
+        for ds in self._data_sources:
+            ds_statements: list[str] = []
+            entities = getattr(ds, "entities", None)
+            for entity in entities or []:
+                ds_statements.append(f"_ds.entities.add({entity.to_js()});")
+            statements.append(ds_statements)
+        return statements
+
     def _build_tileset_js_list(self) -> list[str]:
         """Build JS expressions for all tilesets."""
         return [ts.to_js() for ts in self._tilesets]
@@ -812,21 +828,25 @@ class Viewer:
     # --- Output methods ---
 
     def _doc_parts(self) -> dict[str, Any]:
-        """Return all serialized JS pieces of this viewer, for HTML or widgets."""
+        """Return all serialized JS pieces of this viewer, for HTML or widgets.
+
+        Keys are camelCase to match the widget ESM's ``state.*`` reads.
+        """
         return {
-            "viewer_options": self._build_viewer_options_js(),
+            "viewerOptions": self._build_viewer_options_js(),
             "entities": self._build_entity_js_list(),
-            "data_sources": self._build_data_source_js_list(),
+            "dataSources": self._build_data_source_js_list(),
+            "dataSourceEntityStatements": self._build_data_source_entity_statements(),
             "tilesets": self._build_tileset_js_list(),
             "primitives": self._build_primitive_js_list(),
-            "camera_operations": self._build_camera_operations(),
-            "event_handlers": self._build_event_handler_js(),
-            "scene_statements": self._build_scene_statements(),
-            "globe_statements": self._build_globe_statements(),
-            "clock_statements": self._build_clock_statements(),
-            "clustering_statements": self._build_clustering_statements(),
-            "terrain_statement": self._build_terrain_statement(),
-            "custom_scripts": self._custom_scripts,
+            "cameraOperations": self._build_camera_operations(),
+            "eventHandlers": self._build_event_handler_js(),
+            "sceneStatements": self._build_scene_statements(),
+            "globeStatements": self._build_globe_statements(),
+            "clockStatements": self._build_clock_statements(),
+            "clusteringStatements": self._build_clustering_statements(),
+            "terrainStatement": self._build_terrain_statement(),
+            "customScripts": self._custom_scripts,
         }
 
     def _render_html(self, cesium_base_url: str | None = None) -> str:
@@ -849,6 +869,7 @@ class Viewer:
             viewer_options=self._build_viewer_options_js(),
             entities=self._build_entity_js_list(),
             data_sources=self._build_data_source_js_list(),
+            data_source_entity_statements=self._build_data_source_entity_statements(),
             tilesets=self._build_tileset_js_list(),
             primitives=self._build_primitive_js_list(),
             camera_operations=self._build_camera_operations(),
@@ -1080,3 +1101,8 @@ class Viewer:
         """Save CZML to a .czml file."""
         with open(path, "w", encoding="utf-8") as f:
             f.write(self.to_czml_string())
+
+
+__all__ = [
+    "Viewer",
+]

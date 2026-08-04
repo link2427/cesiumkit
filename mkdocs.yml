@@ -68,8 +68,10 @@ nav:
       - Viewer: api/viewer.md
       - Entity: api/entities.md
       - Coordinates & Math: api/coordinates.md
+      - Math: api/math.md
       - Color: api/color.md
       - Materials: api/materials.md
+      - Particle Systems: api/particle.md
       - Camera: api/camera.md
       - Clustering: api/clustering.md
       - Properties: api/properties.md
@@ -84,3 +86,4 @@ nav:
       - Events: api/events.md
       - GIS Integration: api/gis.md
       - Utilities: api/utils.md
+      - Headless Testing: api/testing.md

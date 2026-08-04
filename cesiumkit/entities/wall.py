@@ -24,3 +24,8 @@ class WallGraphics(EntityGraphics):
 
     def _graphics_key(self) -> str:
         return "wall"
+
+
+__all__ = [
+    "WallGraphics",
+]

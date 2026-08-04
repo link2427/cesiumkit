@@ -43,6 +43,8 @@ class GlobeConfig(CesiumBase):
             stmts.append(f"{viewer_var}.scene.globe.baseColor = {to_js_value(self.base_color)};")
         if self.show_ground_atmosphere is not None:
             stmts.append(f"{viewer_var}.scene.globe.showGroundAtmosphere = {str(self.show_ground_atmosphere).lower()};")
+        if self.show_sky_atmosphere is not None:
+            stmts.append(f"{viewer_var}.scene.skyAtmosphere.show = {str(self.show_sky_atmosphere).lower()};")
         if self.terrain_exaggeration is not None:
             stmts.append(f"{viewer_var}.scene.verticalExaggeration = {self.terrain_exaggeration};")
         if self.terrain_exaggeration_relative_height is not None:
@@ -50,3 +52,8 @@ class GlobeConfig(CesiumBase):
                 f"{viewer_var}.scene.verticalExaggerationRelativeHeight = {self.terrain_exaggeration_relative_height};"
             )
         return stmts
+
+
+__all__ = [
+    "GlobeConfig",
+]

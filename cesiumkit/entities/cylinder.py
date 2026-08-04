@@ -26,3 +26,8 @@ class CylinderGraphics(EntityGraphics):
 
     def _graphics_key(self) -> str:
         return "cylinder"
+
+
+__all__ = [
+    "CylinderGraphics",
+]

@@ -99,6 +99,44 @@ class TestFullHtmlOutput:
         assert html.count("dataSources.add") == 2
         assert "primitives.add" in html
 
+    def test_custom_data_source_with_entities(self):
+        ds = cesiumkit.CustomDataSource(name="my_sources")
+        ds.entities.add(
+            cesiumkit.Entity(
+                name="Custom",
+                position=cesiumkit.Cartesian3.from_degrees(-75, 40, 100),
+                point=cesiumkit.PointGraphics(pixel_size=5),
+            )
+        )
+        viewer = cesiumkit.Viewer()
+        viewer.add_data_source(ds)
+        html = viewer.to_html()
+        assert 'var _ds = new Cesium.CustomDataSource("my_sources");' in html
+        assert "viewer.dataSources.add(_ds);" in html
+        assert "_ds.entities.add(" in html
+        assert '"Custom"' in html
+
+    def test_multiple_custom_data_sources_attach_to_their_own(self):
+        """Each source's entity statement must run before the next source is declared."""
+        viewer = cesiumkit.Viewer()
+        for name, entity_name in (("source_a", "EntityA"), ("source_b", "EntityB")):
+            ds = cesiumkit.CustomDataSource(name=name)
+            ds.entities.add(
+                cesiumkit.Entity(
+                    name=entity_name,
+                    position=cesiumkit.Cartesian3.from_degrees(-75, 40, 100),
+                    point=cesiumkit.PointGraphics(pixel_size=5),
+                )
+            )
+            viewer.add_data_source(ds)
+        html = viewer.to_html()
+        assert html.count("var _ds = new Cesium.CustomDataSource(") == 2
+        entity_a = html.index('"EntityA"')
+        source_b_decl = html.index('var _ds = new Cesium.CustomDataSource("source_b")')
+        entity_b = html.index('"EntityB"')
+        assert entity_a < source_b_decl, "EntityA attached after source_b was declared"
+        assert source_b_decl < entity_b, "EntityB attached before source_b was declared"
+
     def test_scene_with_globe_config(self):
         viewer = cesiumkit.Viewer(
             globe=cesiumkit.GlobeConfig(
@@ -109,6 +147,11 @@ class TestFullHtmlOutput:
         html = viewer.to_html()
         assert "enableLighting = true" in html
         assert "depthTestAgainstTerrain = true" in html
+
+    def test_show_sky_atmosphere_emitted(self):
+        viewer = cesiumkit.Viewer(globe=cesiumkit.GlobeConfig(show_sky_atmosphere=False))
+        html = viewer.to_html()
+        assert "scene.skyAtmosphere.show = false" in html
 
     def test_scene_with_terrain_exaggeration(self):
         viewer = cesiumkit.Viewer(

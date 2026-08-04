@@ -227,3 +227,17 @@ class PolylineOutlineMaterial(MaterialBase):
         if self.outline_width is not None:
             result["outlineWidth"] = self.outline_width
         return {"polylineOutline": result} if result else {}
+
+
+__all__ = [
+    "CheckerboardMaterial",
+    "GridMaterial",
+    "ImageMaterial",
+    "MaterialBase",
+    "PolylineArrowMaterial",
+    "PolylineDashMaterial",
+    "PolylineGlowMaterial",
+    "PolylineOutlineMaterial",
+    "SolidColorMaterial",
+    "StripeMaterial",
+]

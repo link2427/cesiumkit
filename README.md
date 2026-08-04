@@ -234,7 +234,9 @@ viewer.on(
 - **Data sources**: GeoJSON, CZML, KML, custom
 - **Imagery providers**: Bing, OSM, SingleTile, WMTS, WMS, URL template, Ion, TMS
 - **Terrain providers**: Ion world terrain, Ion asset, Cesium terrain server, ellipsoid, encoded WMS/WMTS heightmaps
-- **Camera operations**: fly_to, set_view, look_at
+- **Camera operations**: fly_to, set_view, look_at, fly_to_entities, fly_to_bounding_sphere
+- **Entity clustering**: EntityClusterConfig groups nearby points, billboards, and labels
+- **3D Tiles styling**: Cesium3DTileStyle per-feature color, show, and point-size conditions
 - **CZML export**: to_czml_string(), save_czml(), CzmlDocument
 - **Cesium Ion**: token management, 3D Tilesets, terrain
 - **Scene/Globe configuration**: fog, lighting, depth test, atmosphere, post-processing, terrain exaggeration

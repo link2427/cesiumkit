@@ -88,6 +88,8 @@ class Viewer:
         should_animate: bool | None = None,
         # Camera
         camera: Any = None,  # Camera
+        # Clustering
+        clustering: Any = None,  # EntityClusterConfig
     ) -> None:
         # Ion
         if ion_token is None:
@@ -151,6 +153,7 @@ class Viewer:
         self.scene_config = scene
         self.globe_config = globe
         self.clock_config = clock
+        self._clustering = clustering
 
         # Camera
         if camera is None:
@@ -395,6 +398,14 @@ class Viewer:
     def look_at(self, target: Any, offset: Any) -> None:
         """Point the camera at a target."""
         self.camera.look_at(target, offset)
+
+    def fly_to_entities(self, duration: float = 3.0) -> None:
+        """Fly the camera to fit the extent of all entities."""
+        self.camera.fly_to_entities(duration=duration)
+
+    def fly_to_bounding_sphere(self, bounding_sphere: Any, duration: float = 3.0, **kwargs: Any) -> None:
+        """Fly the camera to a bounding sphere."""
+        self.camera.fly_to_bounding_sphere(bounding_sphere, duration=duration, **kwargs)
 
     # --- Runtime clock control ---
 
@@ -745,6 +756,12 @@ class Viewer:
             return self.clock_config.to_js_statements("viewer")
         return []
 
+    def _build_clustering_statements(self) -> list[str]:
+        """Build JS statements for entity clustering configuration."""
+        if self._clustering and hasattr(self._clustering, "to_js_statements"):
+            return self._clustering.to_js_statements("viewer")
+        return []
+
     def _build_terrain_statement(self) -> str | None:
         """Build the JS expression assigned to scene.terrainProvider."""
         if self._terrain_provider is None:
@@ -780,6 +797,7 @@ class Viewer:
             scene_statements=self._build_scene_statements(),
             globe_statements=self._build_globe_statements(),
             clock_statements=self._build_clock_statements(),
+            clustering_statements=self._build_clustering_statements(),
             terrain_statement=self._build_terrain_statement(),
             custom_scripts=self._custom_scripts,
         )

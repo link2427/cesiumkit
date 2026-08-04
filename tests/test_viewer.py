@@ -156,7 +156,48 @@ class TestViewer:
         v.add_tileset(ion_asset_id=75343)
         html = v.to_html()
         assert "Cesium3DTileset" in html
-        assert "75343" in html
+
+    def test_tileset_options_serialize_when_explicit(self):
+        v = cesiumkit.Viewer()
+        v.add_tileset(ion_asset_id=75343, maximum_memory_usage=536870912, maximum_screen_space_error=4.0)
+        html = v.to_html()
+        assert "maximumMemoryUsage: 536870912" in html
+        assert "maximumScreenSpaceError: 4.0" in html
+
+    def test_tileset_defaults_stay_implicit(self):
+        v = cesiumkit.Viewer()
+        v.add_tileset(ion_asset_id=75343)
+        html = v.to_html()
+        assert "Cesium.Cesium3DTileset.fromIonAssetId(75343)" in html
+        assert "maximumScreenSpaceError" not in html
+
+    def test_tileset_style_emits_cesium_3d_tile_style(self):
+        v = cesiumkit.Viewer()
+        v.add_tileset(
+            ion_asset_id=75343,
+            style=cesiumkit.Cesium3DTileStyle(
+                color_conditions=[("${Height} < 100", "color('red')"), ("true", "color('blue')")],
+                point_size=4.0,
+            ),
+        )
+        html = v.to_html()
+        assert "tileset.style = new Cesium.Cesium3DTileStyle({" in html
+        assert "\"${Height} < 100\", color('red')" in html
+        assert "pointSize: 4.0" in html
+
+    def test_fly_to_entities(self):
+        v = cesiumkit.Viewer()
+        v.fly_to_entities(duration=2.0)
+        html = v.to_html()
+        assert "viewer.flyTo(viewer.entities, {" in html
+        assert "duration: 2.0" in html
+
+    def test_fly_to_bounding_sphere(self):
+        v = cesiumkit.Viewer()
+        v.fly_to_bounding_sphere(cesiumkit.Cartesian3.from_degrees(-75, 40, 1000), duration=1.5)
+        html = v.to_html()
+        assert "viewer.camera.flyToBoundingSphere(" in html
+        assert "duration: 1.5" in html
 
     def test_add_particle_system_primitive(self):
         v = cesiumkit.Viewer()

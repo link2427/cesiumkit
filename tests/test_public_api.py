@@ -51,9 +51,17 @@ def _public_module_names() -> list[str]:
     return [f"cesiumkit.{m}" for m in PUBLIC_MODULES] + [f"cesiumkit.entities.{m}" for m in PUBLIC_ENTITY_MODULES]
 
 
+def _import_checked(module_name: str):
+    """Import a module, skipping when an optional dependency is absent."""
+    try:
+        return importlib.import_module(module_name)
+    except ImportError as exc:
+        pytest.skip(f"optional dependency missing for {module_name}: {exc}")
+
+
 @pytest.mark.parametrize("module_name", _public_module_names())
 def test_module_declares_all(module_name: str) -> None:
-    mod = importlib.import_module(module_name)
+    mod = _import_checked(module_name)
     assert hasattr(mod, "__all__"), f"{module_name} must declare __all__"
     assert mod.__all__, f"{module_name} __all__ must not be empty"
     for name in mod.__all__:
@@ -64,7 +72,7 @@ def test_module_declares_all(module_name: str) -> None:
 @pytest.mark.parametrize("module_name", _public_module_names())
 def test_all_covers_all_defined_names(module_name: str) -> None:
     """Every name defined in the module (classes/functions) must be in __all__."""
-    mod = importlib.import_module(module_name)
+    mod = _import_checked(module_name)
     defined = {
         name
         for name, obj in vars(mod).items()

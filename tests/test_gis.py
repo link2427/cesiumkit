@@ -14,6 +14,7 @@ from cesiumkit import (  # noqa: E402
     Entity,
     Viewer,
     dataframe_to_entities,
+    geodataframe_to_czml_packets,
     geodataframe_to_entities,
 )
 from cesiumkit.coordinates import Cartesian3FromDegrees  # noqa: E402
@@ -213,3 +214,22 @@ class TestViewerIntegration:
         html = v.to_html()
         assert "PolygonHierarchy" in html
         assert "fromDegrees" in html
+
+
+class TestCzmlPackets:
+    def test_batches_chunked(self):
+        gdf = gpd.GeoDataFrame(
+            {"name": list("abcdef")},
+            geometry=[Point(0, 0 + i) for i in range(6)],
+            crs="EPSG:4326",
+        )
+        batches = list(geodataframe_to_czml_packets(gdf, batch_size=2, name_column="name"))
+        assert [len(b) for b in batches] == [2, 2, 2]
+        for batch in batches:
+            for packet in batch:
+                assert "id" in packet
+
+    def test_batch_size_validation(self):
+        gdf = gpd.GeoDataFrame(geometry=[Point(0, 0)], crs="EPSG:4326")
+        with pytest.raises(ValueError, match="batch_size"):
+            list(geodataframe_to_czml_packets(gdf, batch_size=0))

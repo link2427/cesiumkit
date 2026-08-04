@@ -308,6 +308,27 @@ def geodataframe_to_entities(
     return entities
 
 
+def geodataframe_to_czml_packets(
+    gdf: Any,
+    *,
+    batch_size: int = 100,
+    **kwargs: Any,
+) -> Any:
+    """Yield CZML packet batches from a GeoDataFrame, chunked for streaming.
+
+    Each yielded batch is a list of CZML packet dicts that can be fed to
+    :meth:`cesiumkit.Viewer.update_czml` or ``stream_czml`` for large
+    datasets. Styling keywords are forwarded to
+    :func:`geodataframe_to_entities` unchanged.
+    """
+    if batch_size <= 0:
+        raise ValueError("batch_size must be positive")
+    for start in range(0, len(gdf), batch_size):
+        chunk = gdf.iloc[start : start + batch_size]
+        entities = geodataframe_to_entities(chunk, **kwargs)
+        yield [entity.to_czml_packet() for entity in entities]
+
+
 def dataframe_to_entities(
     df: Any,
     lon_col: str,

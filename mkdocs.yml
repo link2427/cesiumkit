@@ -60,6 +60,7 @@ nav:
   - Getting Started: getting-started.md
   - Runtime Control: runtime-control.md
   - GeoPandas & Shapely: getting-started-gis.md
+  - Rasters & Large Data: raster.md
   - Gallery: gallery.md
   - Examples: examples.md
   - API Reference:

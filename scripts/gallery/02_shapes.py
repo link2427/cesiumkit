@@ -6,9 +6,10 @@ GALLERY_TITLE = "Shapes & Materials"
 
 viewer = cesiumkit.Viewer(
     title=GALLERY_TITLE,
-    imagery_provider=cesiumkit.OpenStreetMapImageryProvider(
-        url="https://a.tile.openstreetmap.org/",
-    ),
+    # No explicit imagery provider: the gallery runs from cloud CI IPs, which
+    # OpenStreetMap blocks with its "tile usage policy" error tile. The
+    # default (no Ion token) path uses the bundled NaturalEarthII imagery,
+    # which is offline and deterministic.
     animation=False,
     timeline=False,
     base_layer_picker=False,

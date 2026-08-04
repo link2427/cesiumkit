@@ -62,6 +62,8 @@ def fetch(version: str, dest: Path) -> None:
                     continue
                 if Path(rel).name in PRUNE:
                     continue
+                if ".." in Path(rel).parts or Path(rel).is_absolute():
+                    sys.exit(f"error: unsafe member path in archive: {member}")
                 target = dest / rel
                 target.parent.mkdir(parents=True, exist_ok=True)
                 with archive.open(member) as src, target.open("wb") as out:

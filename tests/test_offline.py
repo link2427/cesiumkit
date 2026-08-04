@@ -101,6 +101,11 @@ class TestOfflineServing:
 
     def test_path_traversal_does_not_escape_vendor_dir(self):
         with OfflineServer(_simple_viewer()) as server:
-            with pytest.raises(urllib.error.HTTPError) as excinfo:
-                server.get("/vendor/cesium/../../pyproject.toml")
-            assert excinfo.value.code == 404
+            for path in (
+                "/vendor/cesium/../../pyproject.toml",
+                "/vendor/cesium/../../../../etc/passwd",
+                "/vendor/cesium/%2e%2e/%2e%2e/etc/passwd",
+            ):
+                with pytest.raises(urllib.error.HTTPError) as excinfo:
+                    server.get(path)
+                assert excinfo.value.code == 404, path

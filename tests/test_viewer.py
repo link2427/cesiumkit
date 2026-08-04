@@ -99,7 +99,7 @@ class TestViewer:
             terrain_provider=cesiumkit.CesiumTerrainProvider(url="https://assets.cesium.com/1"),
         )
         html = v.to_html()
-        assert "viewer.scene.terrainProvider = Cesium.CesiumTerrainProvider.fromUrl(" in html
+        assert "viewer.scene.terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(" in html
         assert "terrainProvider:" not in html
 
     def test_custom_container(self):

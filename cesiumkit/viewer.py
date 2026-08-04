@@ -824,12 +824,15 @@ class Viewer:
                 if cesium_base_url and path.startswith(cesium_base_url + "/"):
                     vendor = vendor_dir()
                     if vendor is None:
-                        return os.path.join(tmpdir, path.lstrip("/"))
+                        return super().translate_path(path)
                     rel = path[len(cesium_base_url) :].lstrip("/")
-                    target = os.path.abspath(os.path.join(str(vendor), rel))
-                    if os.path.commonpath([os.path.abspath(str(vendor)), target]) != os.path.abspath(str(vendor)):
-                        # Path traversal outside the vendor dir: 404.
-                        return os.path.join(tmpdir, path.lstrip("/"))
+                    vendor_root = os.path.realpath(str(vendor))
+                    target = os.path.realpath(os.path.join(vendor_root, rel))
+                    if os.path.commonpath([vendor_root, target]) != vendor_root:
+                        # Path traversal outside the vendor dir: fall through
+                        # to the base handler, which strips ".." segments and
+                        # looks under the temp dir -> 404.
+                        return super().translate_path(path)
                     return target
                 return super().translate_path(path)
 

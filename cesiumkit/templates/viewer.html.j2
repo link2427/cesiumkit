@@ -23,27 +23,27 @@
         {% endif %}
 
         {% if not ion_token %}
-        // No Ion token -- explicitly set the base imagery layer to the
-        // NaturalEarthII tiles that Cesium ships on its CDN. We deliberately
-        // avoid `ImageryLayer.fromProviderAsync(...)` here: in headless
-        // chromium the promise chain was leaving the layer stuck with no
-        // attached provider, and the globe rendered as empty skybox. Using
-        // UrlTemplateImageryProvider with a direct template URL bypasses
-        // the async path entirely -- the provider is ready the moment it's
+        // No Ion token -- use the NaturalEarthII tiles that ship with Cesium.
+        // We deliberately avoid `ImageryLayer.fromProviderAsync(...)` here: in
+        // headless chromium the promise chain was leaving the layer stuck with
+        // no attached provider, and the globe rendered as empty skybox. Using
+        // UrlTemplateImageryProvider with a direct template URL bypasses the
+        // async path entirely -- the provider is ready the moment it's
         // constructed.
         const _naturalEarthUrl = Cesium.buildModuleUrl("Assets/Textures/NaturalEarthII/") + "{z}/{x}/{reverseY}.jpg";
-        const viewerOptions = Object.assign({{ viewer_options }}, {
-            baseLayer: new Cesium.ImageryLayer(
+        const viewerOptions = Object.assign({}, {{ viewer_options }});
+        if (!viewerOptions.baseLayer) {
+            viewerOptions.baseLayer = new Cesium.ImageryLayer(
                 new Cesium.UrlTemplateImageryProvider({
                     url: _naturalEarthUrl,
                     tilingScheme: new Cesium.GeographicTilingScheme(),
                     maximumLevel: 2,
                     credit: "Natural Earth II"
                 })
-            ),
-            baseLayerPicker: false,
-            geocoder: false,
-        });
+            );
+        }
+        if (viewerOptions.baseLayerPicker === undefined) viewerOptions.baseLayerPicker = false;
+        if (viewerOptions.geocoder === undefined) viewerOptions.geocoder = false;
         {% else %}
         const viewerOptions = {{ viewer_options }};
         {% endif %}
@@ -66,7 +66,7 @@
         // viewer options.
         (async () => {
             try {
-                viewer.scene.terrainProvider = {{ terrain_statement }};
+                viewer.scene.terrainProvider = await {{ terrain_statement }};
             } catch (error) {
                 console.error('Error loading terrain:', error);
             }

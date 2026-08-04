@@ -69,13 +69,26 @@ def fetch(version: str, dest: Path) -> None:
                 with archive.open(member) as src, target.open("wb") as out:
                     shutil.copyfileobj(src, out)
 
+            # Cesium is Apache-2.0; redistributing Build/Cesium in the wheel
+            # requires the license alongside it. LICENSE.md lives at the zip
+            # root; NOTICE.md is copied when the release ships one.
+            if "LICENSE.md" not in archive.namelist():
+                sys.exit("error: LICENSE.md not found in archive")
+            for license_file in ("LICENSE.md", "NOTICE.md"):
+                if license_file not in archive.namelist():
+                    print(f"note: {license_file} not present in archive; skipping")
+                    continue
+                with archive.open(license_file) as src, (dest / license_file).open("wb") as out:
+                    shutil.copyfileobj(src, out)
+
     cesium_js = dest / "Cesium.js"
     if not cesium_js.is_file() or cesium_js.stat().st_size < 500_000:
         sys.exit("error: vendored Cesium.js missing or suspiciously small; aborting")
     if not (dest / "Assets" / "Textures" / "NaturalEarthII").is_dir():
         sys.exit("error: bundled NaturalEarthII assets not found; aborting")
     (dest / ".cesiumkit-version").write_text(f"{version}\n", encoding="utf-8")
-    print(f"Vendored Cesium {version} into {dest}")
+    total_mb = sum(f.stat().st_size for f in dest.rglob("*") if f.is_file()) / 1024 / 1024
+    print(f"Vendored Cesium {version} into {dest} ({total_mb:.1f} MiB total)")
 
 
 def main() -> None:

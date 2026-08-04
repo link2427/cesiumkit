@@ -28,8 +28,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install ".[dev]"
-      - run: pytest --cov=cesiumkit
+      - run: pip install ".[dev,gis]"
+      - run: pytest --cov=cesiumkit --cov-fail-under=75
 
   # Bundled-build tests (offline serving) need the ~120 MiB Cesium release,
   # so they run in their own job instead of every matrix entry.

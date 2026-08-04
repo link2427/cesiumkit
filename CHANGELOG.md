@@ -4,6 +4,42 @@ All notable changes to cesiumkit are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-08-04
+
+### Added
+
+- **Entity clustering.** `EntityClusterConfig` groups nearby points,
+  billboards, and labels via Cesium's `EntityCollection.clustering`.
+- **Camera fit helpers.** `fly_to_entities()` and `fly_to_bounding_sphere()`
+  on both `Camera` and `Viewer`.
+- **3D Tiles styling.** New `Cesium3DTileStyle` applies per-feature color,
+  show, and point-size conditions; `Cesium3DTileset` options (`show`,
+  `maximumScreenSpaceError`, `maximumMemoryUsage`, `shadows`) now serialize
+  when explicitly set.
+- **Rasters & large data.** `Viewer.add_raster()` displays GeoTIFF/COG files
+  or xarray `DataArray`s as Web Mercator tiles (rio-tiler, `[raster]` extra,
+  served by `show()`); `Viewer.add_points()` aggregates large point sets via
+  datashader (`[datashader]` extra); `gis.geodataframe_to_czml_packets()`
+  streams chunked CZML batches through `stream_czml()`.
+- **Headless render testing.** `cesiumkit.testing` provides
+  `render_state()`/`render_screenshot()`/`serve()` over playwright, a
+  `playwright_browser` pytest fixture, and `scripts/render_examples.py`;
+  a CI `render-check` job renders every show-based example headlessly and
+  uploads the PNGs as artifacts.
+- **Jupyter widget.** `Viewer.to_widget()` returns a `CesiumKitWidget`
+  (anywidget, `[widget]` extra) with live clock control, click events, and
+  screenshots over comm messages — no HTTP server needed.
+
+### Changed
+
+- CI test matrix now installs the GIS extras, so the GeoPandas/Shapely tests
+  actually run, and enforces a coverage gate (`--cov-fail-under=75`, set to
+  the coverage CI measures with the default extras installed).
+- `scripts/fetch_cesium.py` bundles Cesium's `LICENSE.md`/`NOTICE.md`
+  (Apache-2.0) alongside the vendored build and reports its size.
+- CONTRIBUTING documents the release process, including linking the
+  changelog in release notes.
+
 ## [0.4.0] - 2026-08-04
 
 ### Added

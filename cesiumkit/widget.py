@@ -94,8 +94,8 @@ async function render({ model, el }) {
         viewer.entities.add(eval(entityJs));
     }
     for (let i = 0; i < (state.dataSources || []).length; i++) {
-        const ds = eval(state.dataSources[i]);
-        viewer.dataSources.add(ds);
+        var _ds = eval(state.dataSources[i]);
+        viewer.dataSources.add(_ds);
         for (const stmt of (state.dataSourceEntityStatements || [])[i] || []) {
             eval(stmt);
         }

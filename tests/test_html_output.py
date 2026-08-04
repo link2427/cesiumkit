@@ -111,9 +111,9 @@ class TestFullHtmlOutput:
         viewer = cesiumkit.Viewer()
         viewer.add_data_source(ds)
         html = viewer.to_html()
-        assert 'const _ds0 = new Cesium.CustomDataSource("my_sources");' in html
-        assert "viewer.dataSources.add(_ds0);" in html
-        assert "_ds0.entities.add(" in html
+        assert 'var _ds = new Cesium.CustomDataSource("my_sources");' in html
+        assert "viewer.dataSources.add(_ds);" in html
+        assert "_ds.entities.add(" in html
         assert '"Custom"' in html
 
     def test_scene_with_globe_config(self):

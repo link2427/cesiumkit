@@ -1,10 +1,13 @@
-# GeoDataFrame to globe in 3 lines
+# How to plot a GeoDataFrame on the globe
 
-cesiumkit adds native support for [GeoPandas](https://geopandas.org)
+_How-to. Target: a GeoDataFrame (or a plain DataFrame with lon/lat columns)
+rendered as entities, optionally styled by column values._
+
+cesiumkit has native support for [GeoPandas](https://geopandas.org)
 and [Shapely](https://shapely.readthedocs.io). If you have a `GeoDataFrame`,
 you can drop it on the globe with a single call.
 
-## Install
+## 1. Install the GIS extra
 
 ```bash
 pip install cesiumkit[gis]
@@ -13,7 +16,7 @@ pip install cesiumkit[gis]
 This pulls in `geopandas` and `shapely`. If you already have them, the base
 `pip install cesiumkit` is all you need.
 
-## Minimal example
+## 2. Add the GeoDataFrame
 
 ```python
 import geopandas as gpd
@@ -25,14 +28,14 @@ viewer.add_geodataframe(gdf, name_column="NAME")
 viewer.show()
 ```
 
-That's it. The GeoDataFrame is reprojected to WGS84 if it has a different
-CRS, then each row becomes an `Entity` with the appropriate graphics:
+The GeoDataFrame is reprojected to WGS84 if it has a different CRS, then
+each row becomes an `Entity` with the appropriate graphics:
 
 - `Point` / `MultiPoint` → `PointGraphics`
 - `LineString` / `MultiLineString` → `PolylineGraphics`
 - `Polygon` / `MultiPolygon` → `PolygonGraphics` (with holes preserved)
 
-## Styling by column
+## 3. Style by column
 
 Use column values to drive per-feature styling:
 
@@ -52,7 +55,7 @@ viewer.add_geodataframe(
 `color_column` accepts `Color` instances, CSS/hex strings like `"#ff8800"`,
 or named colors like `"RED"`.
 
-## Plain DataFrames
+## 4. Use a plain DataFrame instead
 
 If you don't have a GeoDataFrame but you do have a CSV with lon/lat columns:
 
@@ -70,7 +73,7 @@ viewer.add_dataframe(
 )
 ```
 
-## Using Shapely directly
+## 5. Pass shapely geometries directly
 
 You can also pass shapely geometries anywhere cesiumkit expects positions —
 Pydantic validators auto-convert them:
@@ -97,7 +100,7 @@ viewer.add_entity(
 )
 ```
 
-Shapely is CRS-naive, so cesiumkit assumes the coordinates are WGS84 lon/lat.
-If your shapely geometries are in another CRS, reproject them (e.g. with
-`pyproj`) before passing them in — or use `GeoDataFrame` which carries CRS
-information and auto-reprojects.
+Shapely is CRS-naive, so cesiumkit assumes the coordinates are WGS84
+lon/lat. If your shapely geometries are in another CRS, reproject them
+(e.g. with `pyproj`) before passing them in — or use a `GeoDataFrame`,
+which carries CRS information and auto-reprojects.

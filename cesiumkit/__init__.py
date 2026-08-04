@@ -162,12 +162,16 @@ from cesiumkit.terrain import (
 # Viewer — the main entry point
 from cesiumkit.viewer import Viewer
 
+
 # Make named colors accessible as Color.RED, etc.
-for _name in dir(_color_module):
-    _obj = getattr(_color_module, _name)
-    if isinstance(_obj, Color) and _name.isupper():
-        setattr(Color, _name, _obj)
-del _name, _obj
+def _inject_named_colors() -> None:
+    for name in dir(_color_module):
+        obj = getattr(_color_module, name)
+        if isinstance(obj, Color) and name.isupper():
+            setattr(Color, name, obj)
+
+
+_inject_named_colors()
 
 __all__ = [
     "__version__",

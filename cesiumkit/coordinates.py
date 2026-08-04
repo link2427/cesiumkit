@@ -83,7 +83,9 @@ class Cartesian3(CesiumBase):
         if not is_shapely_geom(geom):
             raise ValueError(f"Expected a shapely geometry, got {type(geom).__name__}")
         if getattr(geom, "geom_type", None) != "Point":
-            raise ValueError(f"Cartesian3.from_shapely only supports Point geometries, got {geom.geom_type}")
+            raise ValueError(
+                f"Cartesian3.from_shapely only supports Point geometries, got {getattr(geom, 'geom_type', None)}"
+            )
         return shapely_point_to_cartesian3(geom)
 
 

@@ -32,6 +32,19 @@ jobs:
       - run: pip install ".[dev,gis]"
       - run: pytest --cov=cesiumkit --cov-fail-under=75
 
+  # Docstring drift guard: any broken ``` >>> ``` example in the package
+  # fails this job. Needs every optional extra so all modules import.
+  doctest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install ".[dev,gis,raster,datashader,widget]" playwright
+      - run: python -m playwright install chromium --with-deps
+      - run: pytest --doctest-modules cesiumkit tests -q
+
   # Bundled-build tests (offline serving) need the ~120 MiB Cesium release,
   # so they run in their own job instead of every matrix entry.
   offline:
@@ -44,6 +57,43 @@ jobs:
       - run: pip install ".[dev]"
       - run: python scripts/fetch_cesium.py
       - run: pytest tests/test_offline.py
+
+  # Type-check the package with pyright. Installs every optional extra so
+  # missing-import noise from optional deps doesn't mask real type errors.
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install ".[dev,gis,raster,datashader,widget]" playwright
+      - run: pyright cesiumkit
+
+  # Build the wheel and verify it ships the PEP 561 marker and imports
+  # cleanly in a fresh venv (no vendor fetch needed — force-include has a
+  # committed .gitkeep placeholder).
+  wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install build
+      - run: python -m build --wheel
+      - run: |
+          python - <<'EOF'
+          import glob, venv, subprocess, zipfile
+          wheel = glob.glob("dist/*.whl")[0]
+          names = zipfile.ZipFile(wheel).namelist()
+          assert "cesiumkit/py.typed" in names, "py.typed missing from wheel"
+          print("py.typed present in", wheel)
+          venv.EnvBuilder(with_pip=True).create("/tmp/wheelvenv")
+          subprocess.run(["/tmp/wheelvenv/bin/pip", "install", "-q", wheel], check=True)
+          print("installed into fresh venv")
+          EOF
+      - run: /tmp/wheelvenv/bin/python -c "import cesiumkit; print('import OK', cesiumkit.__version__)"
 
   # Headless render check: prove the examples still initialize and render on
   # the bundled Cesium build, and upload the PNGs as build artifacts.

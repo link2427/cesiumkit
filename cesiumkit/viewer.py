@@ -23,9 +23,16 @@ from uuid import uuid4
 from cesiumkit._html import DEFAULT_CESIUM_VERSION, HtmlDocument
 from cesiumkit._js_serializer import camelize, to_js_value
 from cesiumkit._vendor import vendor_base_url, vendor_dir
+from cesiumkit.camera import Camera
+from cesiumkit.clock import ClockConfig
+from cesiumkit.clustering import EntityClusterConfig
 from cesiumkit.czml import CzmlDocument
 from cesiumkit.enums import SceneMode, ScreenSpaceEventType
 from cesiumkit.events import EventHandler
+from cesiumkit.globe import GlobeConfig
+from cesiumkit.imagery import ImageryProvider
+from cesiumkit.scene import SceneConfig
+from cesiumkit.terrain import TerrainProvider
 from cesiumkit.utils import JsCode
 
 logger = logging.getLogger(__name__)
@@ -76,20 +83,20 @@ class Viewer:
         show_renderer_errors: bool | None = None,
         # Scene
         scene_mode: SceneMode | None = None,
-        scene: Any = None,  # SceneConfig
+        scene: SceneConfig | None = None,
         # Globe
-        globe: Any = None,  # GlobeConfig
+        globe: GlobeConfig | None = None,
         # Terrain
-        terrain_provider: Any = None,  # TerrainProvider
+        terrain_provider: TerrainProvider | None = None,
         # Imagery
-        imagery_provider: Any = None,  # ImageryProvider
+        imagery_provider: ImageryProvider | None = None,
         # Clock
-        clock: Any = None,  # ClockConfig
+        clock: ClockConfig | None = None,
         should_animate: bool | None = None,
         # Camera
-        camera: Any = None,  # Camera
+        camera: Camera | None = None,
         # Clustering
-        clustering: Any = None,  # EntityClusterConfig
+        clustering: EntityClusterConfig | None = None,
     ) -> None:
         # Ion
         if ion_token is None:
@@ -157,8 +164,6 @@ class Viewer:
 
         # Camera
         if camera is None:
-            from cesiumkit.camera import Camera
-
             camera = Camera()
         self.camera = camera
 
@@ -913,6 +918,8 @@ class Viewer:
             f.write(self._render_html(cesium_base_url=cesium_base_url))
 
         class Handler(SimpleHTTPRequestHandler):
+            _viewer: Any
+
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, directory=tmpdir, **kwargs)
 

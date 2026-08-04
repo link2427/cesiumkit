@@ -1,49 +1,54 @@
-# Rasters & Large Point Data
+# How to display rasters and large point data
 
-Display local georeferenced rasters and aggregate huge point sets directly on
-the globe. Both features serve tiles through the local ``show()`` server, so
-they need a running server (not static HTML export).
+_How-to. Target: a local GeoTIFF as the base imagery layer, and millions of
+points aggregated into one tile layer instead of thousands of entities._
 
-Install the extras:
+Both features serve tiles through the local `show()` server, so they need a
+running server — they do not work in static HTML export or the notebook
+widget.
+
+## 1. Install the extras
 
 ```bash
 pip install "cesiumkit[raster]"     # rio-tiler / rasterio / xarray
-pip install "cesiumkit[datashader]" # datashader aggregation
+pip install "cesiumkit[datashader]" # point aggregation
 ```
 
-## Local rasters
+## 2. Add a raster as the base layer
 
 ```python
 import cesiumkit
 
 viewer = cesiumkit.Viewer()
-viewer.add_raster("elevation.tif")  # GeoTIFF / COG path
+viewer.add_raster("elevation.tif")  # any path rasterio can open
 viewer.show()
 ```
 
-``add_raster`` accepts a file path (anything rasterio can open) or a
-georeferenced ``xarray.DataArray``, and sets it as the base imagery layer.
-Tiles are served from ``/raster/<id>/{z}/{x}/{y}.png`` in Web Mercator,
-matching Cesium's default tiling scheme.
+`add_raster` accepts a file path or a georeferenced `xarray.DataArray` and
+sets it as the base imagery layer. Tiles are served from
+`/raster/<id>/{z}/{x}/{y}.png` in Web Mercator, matching Cesium's default
+tiling scheme.
 
-## Large point data with datashader
+## 3. Aggregate a huge point set with datashader
 
 ```python
-viewer.add_points(gdf)  # aggregated to an imagery layer, no per-point entities
+viewer.add_points(gdf)  # GeoDataFrame; aggregated to an imagery layer
 ```
 
-With ``aggregation=True`` (default) the points are rasterized with
+With `aggregation=True` (the default) the points are rasterized with
 datashader, which stays responsive for millions of points. Pass
-``aggregation=False`` to fall back to per-point entities.
+`aggregation=False` to fall back to one entity per point.
 
-## Streaming a GeoDataFrame as CZML
+## 4. Stream a GeoDataFrame as CZML instead
 
-For moderate-size vector data you can stream a GeoDataFrame to the live
-viewer in batches instead of aggregating:
+For moderate-size vector data you can stream batches to the live viewer
+without aggregating:
 
 ```python
 packets = cesiumkit.geodataframe_to_czml_packets(gdf, batch_size=500, color_column="color_hex")
 viewer.stream_czml(packets, interval=1.0)
 ```
 
-::: cesiumkit.raster
+## API reference
+
+- ::: cesiumkit.raster

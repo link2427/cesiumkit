@@ -1,14 +1,19 @@
-# Getting Started
+# How to build your first globe
 
-## Installation
+_How-to. Target: a local `show()` viewer with a point and a polygon, running
+offline-friendly, in about 20 lines._
+
+## 1. Install
 
 ```bash
 pip install cesiumkit
 ```
 
-Requires Python 3.10+. No external binary dependencies.
+Requires Python 3.10+. No external binary dependencies. The published wheel
+includes a bundled Cesium build, so it also works fully offline (see
+[Offline use](#7-offline-use)).
 
-## Your first globe
+## 2. Create a viewer and add a point
 
 ```python
 import cesiumkit
@@ -21,12 +26,9 @@ viewer.add_entity(
         point=cesiumkit.PointGraphics(pixel_size=12, color=cesiumkit.Color.RED),
     )
 )
-viewer.show()
 ```
 
-This opens your default browser with an interactive 3D globe. Press `Ctrl+C` to stop the local server.
-
-## Adding more entities
+## 3. Add a polygon
 
 ```python
 viewer.add_entity(
@@ -46,29 +48,43 @@ viewer.add_entity(
 )
 ```
 
-## Cesium Ion token
+## 4. Show it
 
-Many features work without a token (using bundled offline imagery). For full functionality — Bing imagery, world terrain, 3D Tilesets — get a free token at [cesium.com/ion](https://cesium.com/ion/):
+```python
+viewer.show()
+```
+
+This opens your default browser with an interactive 3D globe. Press
+`Ctrl+C` to stop the local server.
+
+## 5. Add a Cesium Ion token (optional)
+
+Many features work without a token using bundled offline imagery. For Bing
+imagery, world terrain, or 3D Tilesets, get a free token at
+[cesium.com/ion](https://cesium.com/ion/):
 
 ```python
 cesiumkit.Ion.set_default_token("your-token-here")
 ```
 
-## Offline use
+## 6. See what's next
 
-By default pages load CesiumJS from the CDN. To run fully offline (air-gapped
-machines, CI, headless servers), vendor the Cesium build once and `show()`
-will serve it locally, including the NaturalEarthII fallback imagery:
+- Browse the [Examples](examples.md) for common patterns
+- Explore the [API Reference](api/viewer.md) for all available classes
+- Follow the [Flight tracker tutorial](tutorial.md) to build something
+  multi-step
+
+## 7. Offline use
+
+By default pages load CesiumJS from the CDN. To run fully offline
+(air-gapped machines, CI, headless servers), vendor the Cesium build once
+and `show()` serves it locally, including the NaturalEarthII fallback
+imagery:
 
 ```bash
 python scripts/fetch_cesium.py
 ```
 
-The wheel published to PyPI includes the vendored build, so `pip install
-cesiumkit` works offline out of the box after the 0.4.0 release. Static HTML
-export and Jupyter embedding still load from the CDN.
-
-## What's next?
-
-- Browse the [Examples](examples.md) for common patterns
-- Explore the [API Reference](api/viewer.md) for all available classes
+The wheel published to PyPI already includes the vendored build, so
+`pip install cesiumkit` works offline out of the box. Static HTML export
+and Jupyter embedding still load from the CDN.

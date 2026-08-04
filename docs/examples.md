@@ -1,6 +1,9 @@
 # Examples
 
-The [`examples/`](https://github.com/link2427/cesiumkit/tree/main/examples) directory contains 11 runnable scripts covering all major features.
+_Reference. Index of the 11 runnable scripts in
+[`examples/`](https://github.com/link2427/cesiumkit/tree/main/examples),
+each demonstrating one feature area. For screenshots of a rendered subset,
+see the [Gallery](gallery.md)._
 
 Run any example:
 

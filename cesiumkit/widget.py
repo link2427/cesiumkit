@@ -182,7 +182,7 @@ class CesiumKitWidget(anywidget.AnyWidget):
             "height": height,
             **parts,
         }
-        self.on_msg(self._handle_msg)
+        self.on_msg(self._on_widget_message)
 
     # --- Command bridge (Python -> JS) ---
 
@@ -200,11 +200,13 @@ class CesiumKitWidget(anywidget.AnyWidget):
                 self._pending.pop(request_id, None)
             raise TimeoutError(f"widget command timed out: {js[:80]}")
 
-    def _handle_msg(self, widget: Any, content: dict[str, Any], buffers: list[bytes]) -> None:
-        del widget, buffers  # anywidget callback signature; unused by the handler
+    def _on_widget_message(self, widget: Any, content: dict[str, Any], buffers: list[bytes]) -> None:
+        del widget, buffers  # on_msg callback signature; unused by the handler
         msg_type = content.get("type")
         if msg_type == "result":
             request_id = content.get("requestId")
+            if request_id is None:
+                return
             with self._condition:
                 future = self._pending.pop(request_id, None)
                 if future is not None:

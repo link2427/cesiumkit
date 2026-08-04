@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 
 def camelize(name: str) -> str:
@@ -33,8 +33,9 @@ def to_js_value(obj: Any) -> str:
         return "true" if obj else "false"
     # Enum MUST be checked before str, because CesiumEnum inherits from str
     if isinstance(obj, Enum):
-        if hasattr(obj, "to_js"):
-            return obj.to_js()
+        to_js = getattr(obj, "to_js", None)
+        if callable(to_js):
+            return cast(str, to_js())
         return json.dumps(obj.value)
     if isinstance(obj, (int, float)):
         return repr(obj)

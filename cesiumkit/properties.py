@@ -53,8 +53,12 @@ class SampledProperty(PropertyBase):
             time: ISO 8601 string or JulianDate
             value: The value at this time
         """
-        if hasattr(time, "iso8601"):
-            time = time.iso8601
+        if isinstance(time, str):
+            pass
+        else:
+            iso = getattr(time, "iso8601", None)
+            if iso is not None:
+                time = iso
         self._samples.append((time, value))
 
     def add_samples(self, times: list, values: list) -> None:
@@ -104,8 +108,12 @@ class SampledPositionProperty(PropertyBase):
             time: ISO 8601 string or JulianDate
             position: Cartesian3 or Cartesian3FromDegrees
         """
-        if hasattr(time, "iso8601"):
-            time = time.iso8601
+        if isinstance(time, str):
+            pass
+        else:
+            iso = getattr(time, "iso8601", None)
+            if iso is not None:
+                time = iso
         self._samples.append((time, position))
 
     def add_samples(self, times: list, positions: list) -> None:

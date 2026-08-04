@@ -160,6 +160,37 @@ my_type: MyTypeGraphics | None = None
 4. Write a clear PR description explaining what changed and why.
 5. Submit!
 
+## Deprecation policy
+
+cesiumkit follows the pandas-style schedule: **deprecate in a minor
+release, remove only at 1.0** (and in majors after that).
+
+- To deprecate an API, emit a `DeprecationWarning` via
+  `cesiumkit._deprecations` (`warn_deprecated` for constructor params and
+  attributes, the `@deprecated` decorator for functions/methods). Every
+  message names the removal release and the replacement when one exists.
+- Do **not** remove deprecated APIs in a minor release. Removal happens at
+  1.0 (or the next major) and is listed in the changelog `Removed`
+  section.
+- Every release that adds deprecations gets a changelog `Deprecated`
+  section listing each item, its replacement, and its removal release.
+- The `deprecations` CI job runs the suite with
+  `-W error::DeprecationWarning`, so internal uses of deprecated APIs and
+  regressions fail CI. Tests that intentionally exercise a deprecated API
+  must wrap the call in `pytest.warns(DeprecationWarning)`.
+
+## Version support
+
+cesiumkit follows [SPEC 0](https://scientific-python.org/specs/spec-0000/):
+at each release the package supports the three oldest active Python minor
+versions (at the time of writing: 3.10, 3.11, 3.12, plus the latest).
+The oldest supported version is dropped at each minor release.
+
+- `requires-python` in `pyproject.toml` and the CI test matrix must stay in
+  sync with this policy.
+- Dependency minimums are bumped on the same cadence where practical; note
+  the change in the changelog.
+
 ## Releasing
 
 Releases are cut from `main` with an annotated tag (`vX.Y.Z`, matching the

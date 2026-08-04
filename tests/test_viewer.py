@@ -77,7 +77,8 @@ class TestViewer:
         assert html.count("viewer.entities.add") == 2
 
     def test_cesium_version(self):
-        v = cesiumkit.Viewer(cesium_version="1.115")
+        with pytest.warns(DeprecationWarning):
+            v = cesiumkit.Viewer(cesium_version="1.115")
         html = v.to_html()
         assert "releases/1.115/" in html
 

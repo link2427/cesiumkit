@@ -4,6 +4,33 @@ All notable changes to cesiumkit are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] - 2026-08-04
+
+### Added
+
+- **Deprecation machinery.** `cesiumkit._deprecations` provides
+  `warn_deprecated()` and an `@deprecated` decorator; every warning names
+  the removal release and the replacement. The policy (deprecate in
+  minors, remove at 1.0) is in CONTRIBUTING, and a CI job runs the suite
+  with `-W error::DeprecationWarning` so regressions fail.
+- **Version-support policy.** cesiumkit follows SPEC 0: the three oldest
+  active Python versions, dropping the oldest at each minor release
+  (documented in CONTRIBUTING).
+
+### Deprecated
+
+- `Viewer(cesium_version=...)` — omit the argument; cesiumkit uses the
+  bundled, pinned Cesium build. Will be removed in 1.0.
+- `OpenStreetMapImageryProvider` — use `UrlTemplateImageryProvider`
+  instead (CesiumJS itself deprecates the OSM provider). Will be removed
+  in 1.0.
+
+### Changed
+
+- Development status classifier moved from `3 - Alpha` to `4 - Beta`.
+- Coverage hardening: `material.py` 50% -> 99%, `math.py` and `utils.py`
+  to 100%; the suite totals 89% locally.
+
 ## [0.7.0] - 2026-08-04
 
 ### Added

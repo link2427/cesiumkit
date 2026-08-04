@@ -35,7 +35,8 @@ class TestBingMapsImageryProvider:
 
 class TestOpenStreetMapImageryProvider:
     def test_to_js(self):
-        p = OpenStreetMapImageryProvider()
+        with pytest.warns(DeprecationWarning):
+            p = OpenStreetMapImageryProvider()
         js = p.to_js()
         assert "OpenStreetMapImageryProvider" in js
 

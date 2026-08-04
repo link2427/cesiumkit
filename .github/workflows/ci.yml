@@ -43,3 +43,21 @@ jobs:
       - run: pip install ".[dev]"
       - run: python scripts/fetch_cesium.py
       - run: pytest tests/test_offline.py
+
+  # Headless render check: prove the examples still initialize and render on
+  # the bundled Cesium build, and upload the PNGs as build artifacts.
+  render-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install ".[dev,gis]" playwright
+      - run: python -m playwright install chromium --with-deps
+      - run: python scripts/fetch_cesium.py
+      - run: mkdir -p /tmp/cesiumkit-renders && python scripts/render_examples.py --output /tmp/cesiumkit-renders
+      - uses: actions/upload-artifact@v4
+        with:
+          name: example-renders
+          path: /tmp/cesiumkit-renders

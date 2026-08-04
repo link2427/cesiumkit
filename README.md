@@ -199,7 +199,7 @@ viewer.save_czml("output.czml")
 
 ### Imagery and terrain providers
 
-8 imagery providers (Bing, OpenStreetMap, Mapbox, WMTS, WMS, URL template, Ion, TileMapService) and terrain providers for Cesium Ion, ellipsoid, and encoded WMS/WMTS heightmaps.
+8 imagery providers (Bing, OpenStreetMap, SingleTile, WMTS, WMS, URL template, Ion, TileMapService) and terrain providers for Cesium Ion, Cesium terrain servers, ellipsoid, and encoded WMS/WMTS heightmaps.
 
 ### Cesium Ion integration
 
@@ -232,12 +232,12 @@ viewer.on(
 - **148 named colors** with `.with_alpha()` support
 - **Time-dynamic properties**: SampledPositionProperty, SampledProperty, ConstantProperty, TimeIntervalCollectionProperty, ReferenceProperty, CompositeProperty
 - **Data sources**: GeoJSON, CZML, KML, custom
-- **Imagery providers**: Bing, OSM, Mapbox, WMTS, WMS, URL template, Ion, TMS
-- **Terrain providers**: Ion world terrain, Ion asset, ellipsoid, encoded WMS/WMTS heightmaps
+- **Imagery providers**: Bing, OSM, SingleTile, WMTS, WMS, URL template, Ion, TMS
+- **Terrain providers**: Ion world terrain, Ion asset, Cesium terrain server, ellipsoid, encoded WMS/WMTS heightmaps
 - **Camera operations**: fly_to, set_view, look_at
 - **CZML export**: to_czml_string(), save_czml(), CzmlDocument
 - **Cesium Ion**: token management, 3D Tilesets, terrain
-- **Scene/Globe configuration**: fog, lighting, shadows, depth test, atmosphere, post-processing, terrain exaggeration
+- **Scene/Globe configuration**: fog, lighting, depth test, atmosphere, post-processing, terrain exaggeration
 - **Runtime control**: clock, live CZML/GeoJSON, selection, picking, screenshots, and Python click callbacks
 - **Event handling**: ScreenSpaceEventHandler with custom JS or Python callbacks
 - **Custom JavaScript injection**: add_script() for arbitrary JS

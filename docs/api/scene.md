@@ -20,7 +20,7 @@ globe = cesiumkit.GlobeConfig(
 viewer = cesiumkit.Viewer(globe=globe)
 ```
 
-CesiumJS 1.119 applies these settings through the scene's vertical
+CesiumJS 1.144 applies these settings through the scene's vertical
 exaggeration properties; `GlobeConfig` provides the Python-facing grouping.
 
 ## Rendering performance

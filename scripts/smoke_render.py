@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Headless render smoke test.
+"""Headless render smoke test (thin CLI wrapper over cesiumkit.testing).
 
 Loads a viewer page in headless Chromium and verifies the globe actually
-initializes and renders tiles. Used to validate the bundled (offline) Cesium
-build end to end; mirrors what the gallery workflow does for screenshots.
+initializes and renders. Used to validate the bundled (offline) Cesium build
+end to end.
 
 Requires:
     pip install playwright
@@ -17,15 +17,9 @@ from __future__ import annotations
 
 import argparse
 import sys
-import threading
-import time
 
 import cesiumkit
-
-try:
-    from playwright.sync_api import sync_playwright
-except ImportError:  # pragma: no cover
-    sys.exit("playwright is not installed; run: pip install playwright && python -m playwright install chromium")
+from cesiumkit import testing
 
 
 def main() -> int:
@@ -49,61 +43,21 @@ def main() -> int:
         )
     )
 
-    thread = threading.Thread(
-        target=viewer.show,
-        kwargs={"port": 0, "open_browser": False},
-        daemon=True,
-    )
-    thread.start()
-    for _ in range(200):
-        if viewer._server is not None:
-            break
-        time.sleep(0.05)
-    else:
-        print("FAIL: server did not start")
-        return 1
-    url = f"http://127.0.0.1:{viewer._server.server_address[1]}/index.html"
-
-    page_errors: list[str] = []
-    with sync_playwright() as p:
-        browser = p.chromium.launch(args=["--no-sandbox", "--disable-dev-shm-usage"])
-        page = browser.new_page(viewport={"width": 1280, "height": 800})
-        page.on("pageerror", lambda exc: page_errors.append(str(exc)))
-        page.goto(url, wait_until="load")
-        page.wait_for_timeout(6000)  # let the first tiles load
-
-        state = page.evaluate(
-            """() => {
-                const v = window.viewer;
-                if (!v || !v.scene || !v.scene.globe) return {ok: false};
-                return {
-                    ok: true,
-                    tilesLoaded: v.scene.globe.tilesLoaded,
-                    imageryLayers: v.imageryLayers.length,
-                    terrainProvider: v.scene.terrainProvider.constructor.name,
-                    cesiumVersion: typeof v.cesiumWidget !== 'undefined' ? 'n/a' : 'n/a',
-                };
-            }"""
-        )
-        if args.screenshot:
-            page.screenshot(path=args.screenshot, full_page=False)
-        browser.close()
-
-    print(f"state: {state}")
     if args.screenshot:
+        testing.render_screenshot(viewer, args.screenshot)
         import os
 
         print(f"screenshot: {args.screenshot} ({os.path.getsize(args.screenshot)} bytes)")
-    if page_errors:
-        print("page errors:")
-        for err in page_errors:
-            print("  -", err)
 
+    state = testing.render_state(viewer)
+    print(f"state: {state}")
     if not state.get("ok"):
         print("FAIL: viewer did not initialize")
         return 1
-    if page_errors:
-        print("FAIL: uncaught page errors")
+    if state.get("pageErrors"):
+        print("FAIL: uncaught page errors:")
+        for err in state["pageErrors"]:
+            print("  -", err)
         return 1
     print("OK")
     return 0

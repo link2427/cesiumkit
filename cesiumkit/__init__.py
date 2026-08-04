@@ -1,5 +1,7 @@
 """cesiumkit: Object-oriented Python interface for CesiumJS 3D geospatial visualization."""
 
+from typing import Any
+
 from cesiumkit import color as _color_module
 from cesiumkit._version import __version__
 
@@ -311,3 +313,16 @@ __all__ = [
     # Viewer
     "Viewer",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    """Lazy top-level exports for optional extras.
+
+    ``cesiumkit.CesiumKitWidget`` (the Jupyter widget) requires the
+    ``[widget]`` extra, so it is only imported on demand.
+    """
+    if name == "CesiumKitWidget":
+        from cesiumkit.widget import CesiumKitWidget
+
+        return CesiumKitWidget
+    raise AttributeError(f"module 'cesiumkit' has no attribute '{name}'")

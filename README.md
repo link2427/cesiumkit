@@ -246,6 +246,7 @@ viewer.on(
 - **Event handling**: ScreenSpaceEventHandler with custom JS or Python callbacks
 - **Custom JavaScript injection**: add_script() for arbitrary JS
 - **Local HTTP server**: `show()` launches a server and opens the browser; serves a bundled offline Cesium build when present
+- **Jupyter widget**: `viewer.to_widget()` renders in a notebook with live clock control, click events, and screenshots (`[widget]` extra)
 - **Works without Ion token**: falls back to the bundled NaturalEarthII imagery (offline when vendored)
 - **Pydantic v2 models**: full validation on all inputs
 

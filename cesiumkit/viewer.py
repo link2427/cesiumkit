@@ -442,6 +442,12 @@ class Viewer:
         """Fly the camera to a bounding sphere."""
         self.camera.fly_to_bounding_sphere(bounding_sphere, duration=duration, **kwargs)
 
+    def to_widget(self, **kwargs: Any) -> Any:
+        """Return a Jupyter widget for this viewer (requires ``[widget]`` extras)."""
+        from cesiumkit.widget import CesiumKitWidget
+
+        return CesiumKitWidget(self, **kwargs)
+
     # --- Runtime clock control ---
 
     def _send_command(self, js: str) -> int:
@@ -804,6 +810,24 @@ class Viewer:
         return self._terrain_provider.to_js()
 
     # --- Output methods ---
+
+    def _doc_parts(self) -> dict[str, Any]:
+        """Return all serialized JS pieces of this viewer, for HTML or widgets."""
+        return {
+            "viewer_options": self._build_viewer_options_js(),
+            "entities": self._build_entity_js_list(),
+            "data_sources": self._build_data_source_js_list(),
+            "tilesets": self._build_tileset_js_list(),
+            "primitives": self._build_primitive_js_list(),
+            "camera_operations": self._build_camera_operations(),
+            "event_handlers": self._build_event_handler_js(),
+            "scene_statements": self._build_scene_statements(),
+            "globe_statements": self._build_globe_statements(),
+            "clock_statements": self._build_clock_statements(),
+            "clustering_statements": self._build_clustering_statements(),
+            "terrain_statement": self._build_terrain_statement(),
+            "custom_scripts": self._custom_scripts,
+        }
 
     def _render_html(self, cesium_base_url: str | None = None) -> str:
         """Render the full HTML document, optionally from a local Cesium build.

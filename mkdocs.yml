@@ -59,6 +59,7 @@ nav:
   - Home: index.md
   - Getting Started: getting-started.md
   - Runtime Control: runtime-control.md
+  - Jupyter Widget: widget.md
   - GeoPandas & Shapely: getting-started-gis.md
   - Rasters & Large Data: raster.md
   - Gallery: gallery.md

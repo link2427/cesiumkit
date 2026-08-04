@@ -168,6 +168,7 @@ class Viewer:
         self.entities = EntityCollection()
         self._data_sources: list[Any] = []
         self._tilesets: list[Any] = []
+        self._raster_sources: dict[str, Any] = {}
         self._primitives: list[Any] = []
         self._event_handlers: list[EventHandler] = []
         self._custom_scripts: list[str] = []
@@ -294,6 +295,40 @@ class Viewer:
         """Add a scene primitive such as a particle system."""
         self._primitives.append(primitive)
         return primitive
+
+    def add_raster(self, source: Any, *, name: str | None = None) -> Any:
+        """Display a local raster (GeoTIFF/COG path or xarray DataArray).
+
+        Requires ``[raster]`` extras (rio-tiler/rasterio/xarray). The raster
+        is served as Web Mercator tiles by the ``show()`` server and set as
+        the viewer's base imagery layer, so it needs a running server (not
+        static HTML export).
+        """
+        from cesiumkit.raster import RasterSource
+
+        raster = RasterSource(source, name=name)
+        self._raster_sources[raster.id] = raster
+        from cesiumkit.imagery import UrlTemplateImageryProvider
+
+        self._viewer_options["base_layer"] = UrlTemplateImageryProvider(
+            url=f"/raster/{raster.id}/{{z}}/{{x}}/{{y}}.png"
+        )
+        return raster
+
+    def add_points(self, gdf: Any, *, aggregation: bool = True, **kwargs: Any) -> Any:
+        """Add points from a GeoDataFrame, optionally aggregated via datashader.
+
+        With ``aggregation=True`` (default) the points are rasterized with
+        datashader (``[datashader]`` extras) into an imagery layer, which
+        stays responsive for millions of points. Pass ``aggregation=False``
+        to fall back to per-point entities.
+        """
+        if not aggregation:
+            return self.add_geodataframe(gdf, **kwargs)
+        from cesiumkit.raster import aggregate_points_to_raster
+
+        path = aggregate_points_to_raster(gdf, **kwargs.pop("aggregate_options", {}))
+        return self.add_raster(path, name=kwargs.pop("name", "points"))
 
     def add_particle_system(self, particle_system: Any = None, **kwargs: Any) -> Any:
         """Add a :class:`cesiumkit.ParticleSystem` scene primitive."""
@@ -858,7 +893,35 @@ class Viewer:
                 if self.path.startswith("/__cesiumkit_cmd"):
                     self._handle_command_poll()
                     return
+                if self.path.startswith("/raster/"):
+                    self._handle_raster_tile()
+                    return
                 super().do_GET()
+
+            def _handle_raster_tile(self):
+                """Serve a Web Mercator tile from a registered raster source."""
+                parts = self.path.split("?")[0].strip("/").split("/")
+                if len(parts) != 5 or parts[0] != "raster":
+                    self.send_error(400, "Invalid raster tile path")
+                    return
+                _, source_id, z, x, y = parts
+                y = y.removesuffix(".png")
+                if not (z.isdigit() and x.isdigit() and y.isdigit()):
+                    self.send_error(400, "Invalid raster tile coordinates")
+                    return
+                source = self._viewer._raster_sources.get(source_id)
+                if source is None:
+                    self.send_error(404, "Unknown raster source")
+                    return
+                body = source.tile(int(z), int(x), int(y))
+                if body is None:
+                    self.send_error(404, "Tile out of range")
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
 
             def do_POST(self):
                 if self.path == "/__cesiumkit_result":
@@ -955,6 +1018,9 @@ class Viewer:
         finally:
             server.server_close()
             self._server = None
+            for raster in self._raster_sources.values():
+                if hasattr(raster, "close"):
+                    raster.close()
 
     def show_in_browser(self) -> None:
         """Alias for show(). Opens visualization via local HTTP server."""

@@ -238,6 +238,8 @@ viewer.on(
 - **Entity clustering**: EntityClusterConfig groups nearby points, billboards, and labels
 - **3D Tiles styling**: Cesium3DTileStyle per-feature color, show, and point-size conditions
 - **CZML export**: to_czml_string(), save_czml(), CzmlDocument
+- **Local rasters**: `add_raster` displays GeoTIFF/COG files or xarray DataArrays as Web Mercator tiles
+- **Large point data**: `add_points` aggregates millions of points via datashader into an imagery layer
 - **Cesium Ion**: token management, 3D Tilesets, terrain
 - **Scene/Globe configuration**: fog, lighting, depth test, atmosphere, post-processing, terrain exaggeration
 - **Runtime control**: clock, live CZML/GeoJSON, selection, picking, screenshots, and Python click callbacks

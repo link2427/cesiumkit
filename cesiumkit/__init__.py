@@ -95,7 +95,7 @@ from cesiumkit.enums import (
 from cesiumkit.events import EventHandler
 
 # GIS integration (GeoPandas / pandas DataFrame helpers)
-from cesiumkit.gis import dataframe_to_entities, geodataframe_to_entities
+from cesiumkit.gis import dataframe_to_entities, geodataframe_to_czml_packets, geodataframe_to_entities
 from cesiumkit.globe import GlobeConfig
 
 # Imagery Providers
@@ -128,6 +128,7 @@ from cesiumkit.material import (
     StripeMaterial,
 )
 from cesiumkit.particle import ParticleSystem
+from cesiumkit.raster import RasterSource, aggregate_points_to_raster
 from cesiumkit.properties import (
     CallbackProperty,
     ConstantProperty,
@@ -303,6 +304,10 @@ __all__ = [
     # GIS helpers
     "geodataframe_to_entities",
     "dataframe_to_entities",
+    "geodataframe_to_czml_packets",
+    # Raster
+    "RasterSource",
+    "aggregate_points_to_raster",
     # Viewer
     "Viewer",
 ]

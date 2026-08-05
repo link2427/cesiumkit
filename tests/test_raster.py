@@ -177,6 +177,33 @@ class TestViewerRaster:
             # bool is an int subclass but is not a valid zoom level
             viewer.add_wmts_layer("https://example.com/wmts", layer="topo", maximum_level=True)
 
+    def test_cross_kind_layers_keep_add_order(self):
+        viewer = cesiumkit.Viewer()
+        viewer.add_raster("dummy.tif")  # base layer
+        viewer.add_wmts_layer("https://example.com/wmts", layer="topo")
+        viewer.add_raster("dummy2.tif", name="second")
+        html = viewer.to_html()
+        wmts_at = html.find("const _wmtsLayer1 = viewer.imageryLayers.addImageryProvider(")
+        raster_at = html.find("const _rasterLayer2 = viewer.imageryLayers.addImageryProvider(")
+        assert wmts_at != -1 and raster_at != -1
+        assert wmts_at < raster_at, "layers must stack in add order, WMTS and raster alike"
+
+    def test_wmts_first_then_raster(self):
+        viewer = cesiumkit.Viewer()
+        viewer.add_wmts_layer("https://example.com/wmts", layer="topo")
+        viewer.add_raster("dummy.tif")
+        html = viewer.to_html()
+        # the raster still becomes the base layer; the WMTS is the overlay
+        assert "const _wmtsLayer0 = viewer.imageryLayers.addImageryProvider(" in html
+        assert "const _rasterLayer" not in html
+
+    def test_add_raster_warns_when_replacing_imagery_provider(self):
+        viewer = cesiumkit.Viewer(
+            imagery_provider=cesiumkit.UrlTemplateImageryProvider(url="https://example.com/{z}/{x}/{y}.png")
+        )
+        with pytest.warns(UserWarning):
+            viewer.add_raster("dummy.tif")
+
     def test_add_points_colormap_convenience(self, bounded_tif):
         pytest.importorskip("datashader")
         pytest.importorskip("geopandas")

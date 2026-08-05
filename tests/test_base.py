@@ -50,6 +50,16 @@ class TestToJsValue:
         assert "</script>" not in result
         assert "\\u003c/script\\u003e" in result
 
+    def test_enum_value_escapes_script_tags(self):
+        from enum import Enum
+
+        class _WeirdValue(str, Enum):
+            X = "</script>"
+
+        result = to_js_value(_WeirdValue.X)
+        assert "</script>" not in result
+        assert "\\u003c/script\\u003e" in result
+
 
 class TestToJsOptions:
     def test_simple(self):

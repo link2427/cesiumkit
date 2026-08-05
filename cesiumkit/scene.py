@@ -87,9 +87,7 @@ class ClassificationPrimitive(CesiumBase):
         elif hasattr(color, "to_js"):
             color = color.to_js()
         else:
-            raise TypeError(
-                f"classification color must be a Color or CSS hex string, got {type(color).__name__}"
-            )
+            raise TypeError(f"classification color must be a Color or CSS hex string, got {type(color).__name__}")
         geometry = (
             "new Cesium.GeometryInstance({\n"
             f"    geometry: new Cesium.PolygonGeometry.fromPositions({{\n"

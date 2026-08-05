@@ -13,6 +13,11 @@ def camelize(name: str) -> str:
     return components[0] + "".join(x.title() for x in components[1:])
 
 
+def _js_escape(js_string: str) -> str:
+    """Escape <, >, & in a JS string literal so it can't terminate an inline script."""
+    return js_string.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+
+
 def to_js_value(obj: Any) -> str:
     """Convert a Python value to its JavaScript literal representation.
 
@@ -36,7 +41,7 @@ def to_js_value(obj: Any) -> str:
         to_js = getattr(obj, "to_js", None)
         if callable(to_js):
             return cast(str, to_js())
-        return json.dumps(obj.value)
+        return _js_escape(json.dumps(obj.value))
     if isinstance(obj, (int, float)):
         return repr(obj)
     if isinstance(obj, JsCode):
@@ -46,13 +51,13 @@ def to_js_value(obj: Any) -> str:
     if isinstance(obj, str):
         # Escape <, >, & so strings can never terminate an inline <script>
         # element even when they are interpolated into HTML pages.
-        return json.dumps(obj).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+        return _js_escape(json.dumps(obj))
     if isinstance(obj, (list, tuple)):
         items = ", ".join(to_js_value(item) for item in obj)
         return f"[{items}]"
     if isinstance(obj, dict):
         return to_js_options(obj)
-    return json.dumps(obj)
+    return _js_escape(json.dumps(obj))
 
 
 def to_js_options(fields: dict[str, Any], exclude_none: bool = True) -> str:

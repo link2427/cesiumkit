@@ -11,6 +11,7 @@ import queue
 import tempfile
 import threading
 import time
+import warnings
 import webbrowser
 from collections import deque
 from collections.abc import Callable, Iterable
@@ -182,8 +183,7 @@ class Viewer:
         self._tilesets: list[Any] = []
         self._raster_sources: dict[str, Any] = {}
         self._primitives: list[Any] = []
-        self._raster_layers: list[dict[str, Any]] = []
-        self._wmts_layers: list[dict[str, Any]] = []
+        self._imagery_layers: list[dict[str, Any]] = []
         self._event_handlers: list[EventHandler] = []
         self._custom_scripts: list[str] = []
 
@@ -351,8 +351,11 @@ class Viewer:
         Requires ``[raster]`` extras (rio-tiler/rasterio/xarray). The raster
         is served as Web Mercator tiles by the ``show()`` server. The first
         raster becomes the viewer's base imagery layer; later rasters stack
-        on top of it, each with its own ``opacity`` (0.0 to 1.0). Needs a
-        running server (not static HTML export).
+        on top of it, each with its own ``opacity`` (0.0 to 1.0). Overlays
+        keep the order they were added in, WMTS and raster alike; the first
+        raster is always the base. Needs a running server (not static HTML
+        export). ``maximum_level`` must be a plain ``int`` (numpy integers
+        are rejected).
         """
         from cesiumkit.raster import RasterSource
 
@@ -368,9 +371,17 @@ class Viewer:
         if maximum_level is not None:
             provider_options["maximum_level"] = maximum_level
         provider = UrlTemplateImageryProvider(**provider_options)
-        if not self._raster_layers:
+        if not any(spec["kind"] == "raster" for spec in self._imagery_layers):
+            if "base_layer" in self._viewer_options:
+                warnings.warn(
+                    "add_raster() replaces the imagery_provider set on the Viewer; the raster becomes the base layer",
+                    UserWarning,
+                    stacklevel=2,
+                )
             self._viewer_options["base_layer"] = provider
-        self._raster_layers.append({"id": raster.id, "opacity": opacity, "maximum_level": maximum_level})
+        self._imagery_layers.append(
+            {"kind": "raster", "id": raster.id, "opacity": opacity, "maximum_level": maximum_level}
+        )
         return raster
 
     def add_wmts_layer(
@@ -389,13 +400,17 @@ class Viewer:
         ``layer``/``style``/``tile_matrix_set`` map to the WMTS
         capabilities for the service at ``url``. The layer is added on top
         of whatever imagery is already configured, with its own opacity.
+        Overlays keep the order they were added in, raster and WMTS alike;
+        the first raster is always the base. ``maximum_level`` must be a
+        plain ``int`` (numpy integers are rejected).
         """
         if not 0.0 <= opacity <= 1.0:
             raise ValueError("opacity must be between 0.0 and 1.0")
         if maximum_level is not None and type(maximum_level) is not int:
             raise TypeError("maximum_level must be an int or None")
-        self._wmts_layers.append(
+        self._imagery_layers.append(
             {
+                "kind": "wmts",
                 "url": url,
                 "layer": layer,
                 "style": style,
@@ -898,7 +913,7 @@ class Viewer:
         """Build JS expressions for event handlers."""
         return [eh.to_js("viewer") for eh in self._event_handlers]
 
-    def _build_raster_statements(self) -> list[str]:
+    def _build_imagery_statements(self) -> list[str]:
         """Build JS statements that stack raster and WMTS imagery layers.
 
         The first local raster is the base layer (a Viewer constructor
@@ -906,39 +921,42 @@ class Viewer:
         order with their own opacity instead of replacing each other.
         """
         statements: list[str] = []
-        for index, spec in enumerate(self._raster_layers):
-            url = f"/raster/{spec['id']}/{{z}}/{{x}}/{{y}}.png"
-            options = [f"url: {to_js_value(url)}"]
-            if spec["maximum_level"] is not None:
-                options.append(f"maximumLevel: {spec['maximum_level']}")
-            if index == 0:
+        base_assigned = False
+        for index, spec in enumerate(self._imagery_layers):
+            if spec["kind"] == "raster":
+                url = f"/raster/{spec['id']}/{{z}}/{{x}}/{{y}}.png"
+                options = [f"url: {to_js_value(url)}"]
+                if spec["maximum_level"] is not None:
+                    options.append(f"maximumLevel: {spec['maximum_level']}")
+                if not base_assigned:
+                    base_assigned = True
+                    if spec["opacity"] != 1.0:
+                        statements.append(f"viewer.imageryLayers.get(0).alpha = {spec['opacity']};")
+                    continue
+                var = f"_rasterLayer{index}"
+                statements.append(
+                    f"const {var} = viewer.imageryLayers.addImageryProvider("
+                    f"new Cesium.UrlTemplateImageryProvider({{{', '.join(options)}}}));"
+                )
                 if spec["opacity"] != 1.0:
-                    statements.append(f"viewer.imageryLayers.get(0).alpha = {spec['opacity']};")
-                continue
-            var = f"_rasterLayer{index}"
-            statements.append(
-                f"const {var} = viewer.imageryLayers.addImageryProvider("
-                f"new Cesium.UrlTemplateImageryProvider({{{', '.join(options)}}}));"
-            )
-            if spec["opacity"] != 1.0:
-                statements.append(f"{var}.alpha = {spec['opacity']};")
-        for index, spec in enumerate(self._wmts_layers):
-            options = [
-                f"url: {to_js_value(spec['url'])}",
-                f"layer: {to_js_value(spec['layer'])}",
-                f"style: {to_js_value(spec['style'])}",
-                f"tileMatrixSetID: {to_js_value(spec['tile_matrix_set'])}",
-                f"format: {to_js_value(spec['format'])}",
-            ]
-            if spec["maximum_level"] is not None:
-                options.append(f"maximumLevel: {spec['maximum_level']}")
-            var = f"_wmtsLayer{index}"
-            statements.append(
-                f"const {var} = viewer.imageryLayers.addImageryProvider("
-                f"new Cesium.WebMapTileServiceImageryProvider({{{', '.join(options)}}}));"
-            )
-            if spec["opacity"] != 1.0:
-                statements.append(f"{var}.alpha = {spec['opacity']};")
+                    statements.append(f"{var}.alpha = {spec['opacity']};")
+            else:
+                options = [
+                    f"url: {to_js_value(spec['url'])}",
+                    f"layer: {to_js_value(spec['layer'])}",
+                    f"style: {to_js_value(spec['style'])}",
+                    f"tileMatrixSetID: {to_js_value(spec['tile_matrix_set'])}",
+                    f"format: {to_js_value(spec['format'])}",
+                ]
+                if spec["maximum_level"] is not None:
+                    options.append(f"maximumLevel: {spec['maximum_level']}")
+                var = f"_wmtsLayer{index}"
+                statements.append(
+                    f"const {var} = viewer.imageryLayers.addImageryProvider("
+                    f"new Cesium.WebMapTileServiceImageryProvider({{{', '.join(options)}}}));"
+                )
+                if spec["opacity"] != 1.0:
+                    statements.append(f"{var}.alpha = {spec['opacity']};")
         return statements
 
     def _build_scene_statements(self) -> list[str]:
@@ -995,7 +1013,7 @@ class Viewer:
             "clockStatements": self._build_clock_statements(),
             "clusteringStatements": self._build_clustering_statements(),
             "terrainStatement": self._build_terrain_statement(),
-            "imageryStatements": self._build_raster_statements(),
+            "imageryStatements": self._build_imagery_statements(),
             "customScripts": self._custom_scripts,
         }
 
@@ -1028,7 +1046,7 @@ class Viewer:
             globe_statements=self._build_globe_statements(),
             clock_statements=self._build_clock_statements(),
             clustering_statements=self._build_clustering_statements(),
-            imagery_statements=self._build_raster_statements(),
+            imagery_statements=self._build_imagery_statements(),
             terrain_statement=self._build_terrain_statement(),
             custom_scripts=self._custom_scripts,
         )

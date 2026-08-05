@@ -92,7 +92,13 @@ exclude = ["cesiumkit/vendor/.gitkeep"]
 force-include = { "cesiumkit/vendor" = "cesiumkit/vendor" }
 
 [tool.hatch.build.targets.sdist]
-exclude = ["cesiumkit/vendor/.gitkeep"]
+exclude = [
+    "cesiumkit/vendor/.gitkeep",
+    # local-only research and session files that must never ship
+    "research-to-1.0",
+    "roadmap-p2-p3.md",
+    ".reasonix",
+]
 force-include = { "cesiumkit/vendor" = "cesiumkit/vendor" }
 
 [tool.pytest.ini_options]

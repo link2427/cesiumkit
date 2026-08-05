@@ -276,6 +276,9 @@ The [`examples/`](examples/) directory contains 11 runnable scripts:
 |---|------|---------------|
 | 01 | `01_basic_point.py` | Minimal point on the globe |
 | 02 | `02_shapes_and_materials.py` | Points, labels, shapes, and materials |
+
+Looking to move from the 0.x series to 1.0? See the
+[Migration Guide](https://link2427.github.io/cesiumkit/migration/).
 | 03 | `03_multiple_cities.py` | Multiple entities on the globe |
 | 04 | `04_time_dynamic_satellite.py` | Animated satellite path with clock |
 | 05 | `05_geojson_and_datasources.py` | GeoJSON, CZML, and KML loading |

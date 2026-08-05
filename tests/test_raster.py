@@ -52,6 +52,39 @@ class TestRasterSource:
         # outside the raster's -10..10 extent.
         assert source.tile(12, 0, 0) is None
 
+    def test_repeated_tile_is_cached(self, bounded_tif):
+        source = RasterSource(bounded_tif)
+        first = source.tile(0, 0, 0)
+        second = source.tile(0, 0, 0)
+        assert first == second
+        assert source.cached_tiles == 1
+
+    def test_cache_evicts_least_recently_used(self, bounded_tif):
+        source = RasterSource(bounded_tif, tile_cache_size=2)
+        source.tile(0, 0, 0)
+        # Out-of-range tiles are not cached.
+        assert source.tile(12, 0, 0) is None
+        assert source.cached_tiles == 1
+        # Fill past the limit; a fresh miss must evict the least recently
+        # used entries (the manually inserted ones), keeping the touched one.
+        source._tile_cache[(9, 9, 9)] = b"old"
+        source._tile_cache[(9, 9, 10)] = b"new"
+        assert source.cached_tiles == 3
+        source.tile(0, 0, 0)  # LRU touch: (0, 0, 0) becomes most recent
+        source.tile(1, 0, 1)  # miss: inserts and evicts down to the limit
+        assert source.cached_tiles == 2
+        assert (0, 0, 0) in source._tile_cache
+        assert (1, 0, 1) in source._tile_cache
+        assert (9, 9, 9) not in source._tile_cache
+        assert (9, 9, 10) not in source._tile_cache
+
+    def test_clear_cache(self, bounded_tif):
+        source = RasterSource(bounded_tif)
+        source.tile(0, 0, 0)
+        assert source.cached_tiles == 1
+        source.clear_cache()
+        assert source.cached_tiles == 0
+
 
 class TestViewerRaster:
     def test_add_raster_emits_provider(self, bounded_tif):

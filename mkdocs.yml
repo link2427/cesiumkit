@@ -61,6 +61,7 @@ nav:
   - Tutorial: tutorial.md
   - Troubleshooting: troubleshooting.md
   - Architecture: architecture.md
+  - Migration Guide: migration.md
   - Runtime Control: runtime-control.md
   - Jupyter Widget: widget.md
   - GeoPandas & Shapely: getting-started-gis.md

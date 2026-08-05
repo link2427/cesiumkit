@@ -2,8 +2,7 @@
 
 These helpers start the local viewer server, load the page in headless
 Chromium, and let you assert on render state or save screenshots. They are
-the library-side equivalent of what ``scripts/generate_gallery.py`` does for
-the gallery, and are what ``scripts/render_examples.py`` uses in CI.
+what ``scripts/render_examples.py`` uses in CI and for the docs gallery.
 
 Playwright is imported lazily, so ``import cesiumkit.testing`` is cheap even
 when it is not installed.

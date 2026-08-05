@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""Render every runnable example headlessly and save PNGs.
+"""Render scripts headlessly and save PNGs.
 
-Used by the CI ``render-check`` job to prove the examples still initialize
-and render on the bundled Cesium build; the PNGs are uploaded as build
-artifacts. Examples that never call ``viewer.show()`` (e.g. the CZML-export
-and runtime-control ones) are skipped.
+The single screenshot entry point for the project:
+
+- the CI ``render-check`` job renders every ``examples/`` script to prove
+  they still initialize and render on the bundled Cesium build;
+- the ``gallery.yml`` workflow renders ``scripts/gallery/`` to PNGs that
+  are committed to the gallery-images branch.
+
+Scripts that never build a viewer (no ``viewer.show()`` call and no
+module-level ``viewer``) are skipped.
 
 Requires:
     pip install "cesiumkit[gis]" playwright
@@ -12,7 +17,7 @@ Requires:
     python scripts/fetch_cesium.py   # for offline serving
 
 Usage:
-    python scripts/render_examples.py [--output /tmp/cesiumkit-renders]
+    python scripts/render_examples.py [--output DIR] [--directory DIR]
 """
 
 from __future__ import annotations
@@ -30,7 +35,12 @@ EXAMPLES_DIR = REPO_ROOT / "examples"
 
 
 def _load_example_viewer(path: Path):
-    """Import an example module, capturing the viewer it calls show() on."""
+    """Import a script module and return its viewer.
+
+    Two patterns are supported: a script that calls ``viewer.show()`` (its
+    viewer is captured via a show() patch), or a script that only builds a
+    module-level ``viewer`` attribute (the gallery scripts).
+    """
     real_show = cesiumkit.Viewer.show
     captured: dict[str, object] = {}
 
@@ -38,6 +48,7 @@ def _load_example_viewer(path: Path):
         captured["viewer"] = self
         return None
 
+    module = None
     cesiumkit.Viewer.show = fake_show
     try:
         module_name = f"render_example_{path.stem}"
@@ -49,25 +60,28 @@ def _load_example_viewer(path: Path):
         spec.loader.exec_module(module)
     finally:
         cesiumkit.Viewer.show = real_show
-    return captured.get("viewer")
+    return captured.get("viewer") or getattr(module, "viewer", None)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", default="/tmp/cesiumkit-renders", help="directory for PNG outputs")
+    parser.add_argument("--directory", default=str(EXAMPLES_DIR), help="directory of scripts to render")
     parser.add_argument("--wait-ms", type=int, default=testing.DEFAULT_WAIT_MS, help="load wait per example")
     args = parser.parse_args()
 
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    examples = sorted(EXAMPLES_DIR.glob("[0-9][0-9]_*.py"))
+    scripts = sorted(Path(args.directory).glob("[0-9][0-9]_*.py"))
     rendered: list[str] = []
     failures: list[str] = []
-    for path in examples:
+    for path in scripts:
         source = path.read_text(encoding="utf-8")
-        if "viewer.show()" not in source:
-            print(f"skip {path.name}: not a show()-based example")
+        if "get_current_time(" in source or "wait_for_click(" in source:
+            # Runtime-control scripts read live browser state; they cannot
+            # be rendered headlessly.
+            print(f"skip {path.name}: runtime-control script (needs a live browser)")
             continue
         try:
             viewer = _load_example_viewer(path)
@@ -76,7 +90,7 @@ def main() -> int:
             print(f"FAIL {path.name}: {exc}")
             continue
         if viewer is None:
-            print(f"skip {path.name}: no viewer.show() call executed")
+            print(f"skip {path.name}: no viewer.show() or module-level viewer")
             continue
         out = output_dir / f"{path.stem}.png"
         try:
@@ -88,7 +102,7 @@ def main() -> int:
         rendered.append(path.name)
         print(f"rendered {path.name} -> {out}")
 
-    print(f"rendered {len(rendered)}/{len(examples)} examples")
+    print(f"rendered {len(rendered)}/{len(scripts)} scripts")
     if failures:
         print("failures:")
         for failure in failures:

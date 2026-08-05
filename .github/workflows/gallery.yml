@@ -32,7 +32,7 @@ jobs:
           # the default Cesium World Imagery. Without a token they fall back to
           # the bundled NaturalEarthII imagery (still looks fine, just flatter).
           CESIUM_ION_TOKEN: ${{ secrets.CESIUM_ION_TOKEN }}
-        run: python scripts/generate_gallery.py
+        run: python scripts/render_examples.py --directory scripts/gallery --output docs/images/gallery
 
       - name: Commit images to gallery-images branch
         run: |

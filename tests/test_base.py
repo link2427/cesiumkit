@@ -43,6 +43,13 @@ class TestToJsValue:
     def test_empty_list(self):
         assert to_js_value([]) == "[]"
 
+    def test_string_escapes_script_tags(self):
+        # a string containing </script> must never be able to terminate an
+        # inline script element when interpolated into an HTML page
+        result = to_js_value("</script><script>alert(1)</script>")
+        assert "</script>" not in result
+        assert "\\u003c/script\\u003e" in result
+
 
 class TestToJsOptions:
     def test_simple(self):

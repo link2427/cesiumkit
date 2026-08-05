@@ -68,7 +68,7 @@ class ClassificationPrimitive(CesiumBase):
 
     positions: list[Cartesian3] = Field(min_length=3)
     color: Any = None
-    height: float = 0.0
+    height: float = Field(default=0.0, allow_inf_nan=False)
     classification_type: ClassificationType = ClassificationType.BOTH
     show: bool = True
 

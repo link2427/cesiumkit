@@ -97,6 +97,20 @@ class TestWidgetState:
         assert "NYC" in json.dumps(state["entities"])
         assert "https://cesium.com" in state["cesiumUrl"]
 
+    def test_cesium_version_validation(self):
+        with pytest.raises(ValueError):
+            CesiumKitWidget(_viewer(), cesium_version="1")
+        with pytest.raises(ValueError):
+            CesiumKitWidget(_viewer(), cesium_version="latest")
+        with pytest.raises(ValueError):
+            CesiumKitWidget(_viewer(), cesium_version="v1.144")
+        with pytest.raises(ValueError):
+            CesiumKitWidget(_viewer(), cesium_version='1.144"));alert(1)//')
+
+    def test_cesium_version_accepts_pinned(self):
+        widget = CesiumKitWidget(_viewer(), cesium_version="1.115.0")
+        assert "releases/1.115.0/" in widget.state["cesiumUrl"]
+
     def test_to_widget_convenience(self):
         widget = _viewer().to_widget()
         assert isinstance(widget, CesiumKitWidget)

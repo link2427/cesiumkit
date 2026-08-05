@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import threading
 from collections.abc import Callable
 from concurrent.futures import Future
@@ -170,6 +171,8 @@ class CesiumKitWidget(anywidget.AnyWidget):
         height: str = "600px",
         cesium_version: str = DEFAULT_CESIUM_VERSION,
     ) -> None:
+        if not re.fullmatch(r"[0-9]+\.[0-9]+(\.[0-9]+)?", cesium_version):
+            raise ValueError(f"cesium_version must look like '1.144', got {cesium_version!r}")
         super().__init__()
         self._viewer = viewer
         self._pending: dict[str, Future] = {}

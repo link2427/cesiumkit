@@ -44,7 +44,9 @@ def to_js_value(obj: Any) -> str:
     if hasattr(obj, "to_js"):
         return obj.to_js()
     if isinstance(obj, str):
-        return json.dumps(obj)
+        # Escape <, >, & so strings can never terminate an inline <script>
+        # element even when they are interpolated into HTML pages.
+        return json.dumps(obj).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     if isinstance(obj, (list, tuple)):
         items = ", ".join(to_js_value(item) for item in obj)
         return f"[{items}]"

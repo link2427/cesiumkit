@@ -157,6 +157,26 @@ class TestViewerRaster:
         with pytest.raises(ValueError):
             viewer.add_wmts_layer("https://example.com/wmts", layer="topo", opacity=2)
 
+    def test_add_wmts_layer_escapes_script_tags(self):
+        viewer = cesiumkit.Viewer()
+        viewer.add_wmts_layer(
+            "https://example.com/wmts",
+            layer="</script><script>alert(1)</script>",
+        )
+        html = viewer.to_html()
+        assert "\\u003c/script\\u003e" in html
+        assert 'layer: "</script>' not in html
+
+    def test_maximum_level_must_be_int(self):
+        viewer = cesiumkit.Viewer()
+        with pytest.raises(TypeError):
+            viewer.add_wmts_layer("https://example.com/wmts", layer="topo", maximum_level="1});fetch('https://evil')//")
+        with pytest.raises(TypeError):
+            viewer.add_raster("dummy.tif", maximum_level="18")
+        with pytest.raises(TypeError):
+            # bool is an int subclass but is not a valid zoom level
+            viewer.add_wmts_layer("https://example.com/wmts", layer="topo", maximum_level=True)
+
     def test_add_points_colormap_convenience(self, bounded_tif):
         pytest.importorskip("datashader")
         pytest.importorskip("geopandas")

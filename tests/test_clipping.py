@@ -111,6 +111,17 @@ class TestClassificationPrimitive:
                 ]
             )
 
+    def test_non_finite_height_rejected(self):
+        with pytest.raises(ValidationError):
+            cesiumkit.ClassificationPrimitive(
+                positions=[
+                    cesiumkit.Cartesian3(x=0, y=0, z=0),
+                    cesiumkit.Cartesian3(x=1, y=0, z=0),
+                    cesiumkit.Cartesian3(x=0, y=1, z=0),
+                ],
+                height=float("inf"),
+            )
+
     def test_add_classification_through_viewer(self):
         viewer = cesiumkit.Viewer()
         primitive = viewer.add_classification(self._positions())

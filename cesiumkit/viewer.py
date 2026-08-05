@@ -358,6 +358,8 @@ class Viewer:
 
         if not 0.0 <= opacity <= 1.0:
             raise ValueError("opacity must be between 0.0 and 1.0")
+        if maximum_level is not None and type(maximum_level) is not int:
+            raise TypeError("maximum_level must be an int or None")
         raster = RasterSource(source, name=name)
         self._raster_sources[raster.id] = raster
         from cesiumkit.imagery import UrlTemplateImageryProvider
@@ -390,6 +392,8 @@ class Viewer:
         """
         if not 0.0 <= opacity <= 1.0:
             raise ValueError("opacity must be between 0.0 and 1.0")
+        if maximum_level is not None and type(maximum_level) is not int:
+            raise TypeError("maximum_level must be an int or None")
         self._wmts_layers.append(
             {
                 "url": url,
@@ -904,7 +908,7 @@ class Viewer:
         statements: list[str] = []
         for index, spec in enumerate(self._raster_layers):
             url = f"/raster/{spec['id']}/{{z}}/{{x}}/{{y}}.png"
-            options = [f"url: {json.dumps(url)}"]
+            options = [f"url: {to_js_value(url)}"]
             if spec["maximum_level"] is not None:
                 options.append(f"maximumLevel: {spec['maximum_level']}")
             if index == 0:
@@ -920,11 +924,11 @@ class Viewer:
                 statements.append(f"{var}.alpha = {spec['opacity']};")
         for index, spec in enumerate(self._wmts_layers):
             options = [
-                f"url: {json.dumps(spec['url'])}",
-                f"layer: {json.dumps(spec['layer'])}",
-                f"style: {json.dumps(spec['style'])}",
-                f"tileMatrixSetID: {json.dumps(spec['tile_matrix_set'])}",
-                f"format: {json.dumps(spec['format'])}",
+                f"url: {to_js_value(spec['url'])}",
+                f"layer: {to_js_value(spec['layer'])}",
+                f"style: {to_js_value(spec['style'])}",
+                f"tileMatrixSetID: {to_js_value(spec['tile_matrix_set'])}",
+                f"format: {to_js_value(spec['format'])}",
             ]
             if spec["maximum_level"] is not None:
                 options.append(f"maximumLevel: {spec['maximum_level']}")

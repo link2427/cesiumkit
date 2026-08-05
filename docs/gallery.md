@@ -3,7 +3,7 @@
 _Reference. Screenshots of every script in
 [`scripts/gallery/`](https://github.com/link2427/cesiumkit/tree/main/scripts/gallery),
 regenerated headlessly in CI. The six gallery scripts are a curated subset;
-for the full runnable set of 11 scripts, see the [Examples](examples.md)
+for the full runnable set of 11 scripts, see the [Examples](examples/index.md)
 index._
 
 <div class="grid cards" markdown>

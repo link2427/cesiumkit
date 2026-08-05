@@ -7,6 +7,10 @@ The widget runs CesiumJS in the notebook from the CDN — notebooks have no
 local server — and mirrors the runtime control API of `show()`. There is no
 HTTP server to start or stop.
 
+!!! tip "Prefer a plain browser window?"
+    The same control API works over `show()`'s local server — see
+    [How to control a live viewer](runtime-control.md).
+
 ## 1. Install the widget extra
 
 ```bash

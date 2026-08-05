@@ -38,7 +38,6 @@ Entities and their graphics types.
 
 ::: cesiumkit.entities.plane
 
-::: cesiumkit.particle
 
 ## Planes
 

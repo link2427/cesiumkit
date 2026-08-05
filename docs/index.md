@@ -8,21 +8,56 @@ for 3D globes and maps. Define entities, materials, camera views, terrain,
 imagery, and time-dynamic animations in pure Python, then render them in the
 browser with a single call.
 
-```python
-import cesiumkit
+## Why cesiumkit?
 
-viewer = cesiumkit.Viewer(title="Hello Globe")
-viewer.add_entity(
-    cesiumkit.Entity(
-        name="New York",
-        position=cesiumkit.Cartesian3.from_degrees(-74.006, 40.7128, 400),
-        point=cesiumkit.PointGraphics(pixel_size=12, color=cesiumkit.Color.RED),
+The same globe, two ways:
+
+=== "With raw CesiumJS (JavaScript)"
+
+    ```html
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>html, body, #cesiumContainer { width: 100%; height: 100%; margin: 0; }</style>
+    </head>
+    <body>
+      <div id="cesiumContainer"></div>
+      <script src="https://cesium.com/downloads/cesiumjs/releases/1.144/Build/Cesium/Cesium.js"></script>
+      <script>
+        const viewer = new Cesium.Viewer("cesiumContainer", { baseLayerPicker: false });
+        viewer.entities.add({
+          name: "New York",
+          position: Cesium.Cartesian3.fromDegrees(-74.006, 40.7128, 400),
+          point: { pixelSize: 12, color: Cesium.Color.RED }
+        });
+      </script>
+    </body>
+    </html>
+    ```
+
+    You write HTML, wire up the script tag, and remember Cesium's camelCase
+    API from memory.
+
+=== "With cesiumkit (Python)"
+
+    ```python
+    import cesiumkit
+
+    viewer = cesiumkit.Viewer(title="Hello Globe")
+    viewer.add_entity(
+        cesiumkit.Entity(
+            name="New York",
+            position=cesiumkit.Cartesian3.from_degrees(-74.006, 40.7128, 400),
+            point=cesiumkit.PointGraphics(pixel_size=12, color=cesiumkit.Color.RED),
+        )
     )
-)
-viewer.show()  # opens in your browser
-```
+    viewer.show()  # opens in your browser
+    ```
 
-## Features
+    You write Python, get autocomplete and validation, and `show()` serves
+    the page.
+
+## What you get
 
 - **17 entity graphics types**: point, billboard, label, polygon, polyline, box, cylinder, ellipse, ellipsoid, model, corridor, wall, rectangle, path, plane, polyline volume, tileset
 - **Particle systems**: scene primitives for smoke, fire, weather, and trails
@@ -38,10 +73,12 @@ viewer.show()  # opens in your browser
 - **Scene/Globe configuration**: fog, lighting, depth test, atmosphere
 - **Event handling**: click events with custom JavaScript callbacks
 - **Pydantic v2 models**: full validation on all inputs
+- **Type-checked**: PEP 561 `py.typed` marker ships in the wheel; the public API is pyright-clean
 - **Works without an Ion token**: falls back to bundled offline imagery
 
 ## Quick links
 
 - [Getting Started](getting-started.md): install and first visualization
-- [Examples](examples.md): 11 runnable example scripts
-- [API Reference](api/viewer.md): full auto-generated docs
+- [Tutorial](tutorial.md): build a flight tracker step by step
+- [Examples](examples/index.md): 11 runnable example scripts
+- [API Reference](api/index.md): full auto-generated docs

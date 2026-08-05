@@ -2,7 +2,7 @@
 
 Time-dynamic and constant property types. Attach them to entity graphics to
 animate values over time (see the
-[time-dynamic example](../examples.md)).
+[time-dynamic example](../examples/index.md)).
 
 ```python
 import cesiumkit

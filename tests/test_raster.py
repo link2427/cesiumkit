@@ -95,6 +95,99 @@ class TestViewerRaster:
         assert f"/raster/{raster.id}/{{z}}/{{x}}/{{y}}.png" in html
         assert "UrlTemplateImageryProvider" in html
 
+    def test_first_raster_is_base_layer(self, bounded_tif):
+        viewer = cesiumkit.Viewer()
+        viewer.add_raster(bounded_tif)
+        html = viewer.to_html()
+        # baseLayer appears in the constructor options, not as a statement
+        assert "baseLayer: new Cesium.ImageryLayer" in html
+        assert "_rasterLayer" not in html
+
+    def test_second_raster_stacks_as_overlay(self, bounded_tif):
+        viewer = cesiumkit.Viewer()
+        viewer.add_raster(bounded_tif)
+        second = viewer.add_raster(bounded_tif, name="second")
+        html = viewer.to_html()
+        assert "const _rasterLayer1 = viewer.imageryLayers.addImageryProvider(" in html
+        assert f"/raster/{second.id}/{{z}}/{{x}}/{{y}}.png" in html
+
+    def test_raster_opacity(self, bounded_tif):
+        viewer = cesiumkit.Viewer()
+        viewer.add_raster(bounded_tif, opacity=0.4)
+        viewer.add_raster(bounded_tif, name="second", opacity=0.6)
+        html = viewer.to_html()
+        assert "viewer.imageryLayers.get(0).alpha = 0.4;" in html
+        assert "_rasterLayer1.alpha = 0.6;" in html
+
+    def test_raster_opacity_validation(self, bounded_tif):
+        viewer = cesiumkit.Viewer()
+        with pytest.raises(ValueError):
+            viewer.add_raster(bounded_tif, opacity=1.5)
+
+    def test_add_wmts_layer(self):
+        viewer = cesiumkit.Viewer()
+        viewer.add_wmts_layer(
+            "https://example.com/wmts",
+            layer="topo",
+            style="default",
+            tile_matrix_set="EPSG:3857",
+            format="image/png",
+            maximum_level=18,
+            opacity=0.7,
+        )
+        html = viewer.to_html()
+        assert "const _wmtsLayer0 = viewer.imageryLayers.addImageryProvider(" in html
+        assert "new Cesium.WebMapTileServiceImageryProvider({" in html
+        assert 'layer: "topo"' in html
+        assert 'style: "default"' in html
+        assert 'tileMatrixSetID: "EPSG:3857"' in html
+        assert 'format: "image/png"' in html
+        assert "maximumLevel: 18" in html
+        assert "_wmtsLayer0.alpha = 0.7;" in html
+
+    def test_add_wmts_layer_defaults_implicit(self):
+        viewer = cesiumkit.Viewer()
+        viewer.add_wmts_layer("https://example.com/wmts", layer="topo")
+        html = viewer.to_html()
+        assert "_wmtsLayer0.alpha" not in html
+        assert "maximumLevel:" not in html.replace("maximumLevel: 2", "")
+
+    def test_add_wmts_opacity_validation(self):
+        viewer = cesiumkit.Viewer()
+        with pytest.raises(ValueError):
+            viewer.add_wmts_layer("https://example.com/wmts", layer="topo", opacity=2)
+
+    def test_add_points_colormap_convenience(self, bounded_tif):
+        pytest.importorskip("datashader")
+        pytest.importorskip("geopandas")
+        import geopandas as gpd
+        import shapely.geometry
+
+        gdf = gpd.GeoDataFrame(
+            {"value": [1, 2, 3]},
+            geometry=[shapely.geometry.Point(x, y) for x, y in [(0, 0), (1, 1), (2, 2)]],
+            crs="EPSG:4326",
+        )
+        viewer = cesiumkit.Viewer()
+        viewer.add_points(gdf, colormap=["#000000", "#ff0000"], plot_width=256, plot_height=256)
+        html = viewer.to_html()
+        assert "UrlTemplateImageryProvider" in html
+
+    def test_stacked_rasters_render(self, bounded_tif):
+        """The generated layer statements must run, not just exist."""
+        from cesiumkit import _vendor
+
+        if _vendor.vendor_dir() is None:
+            pytest.skip("bundled Cesium build not present")
+        from cesiumkit.testing import render_state
+
+        viewer = cesiumkit.Viewer()
+        viewer.add_raster(bounded_tif, opacity=0.6)
+        viewer.add_raster(bounded_tif, name="second", opacity=0.8)
+        viewer.add_wmts_layer("https://example.com/wmts", layer="topo", opacity=0.5)
+        state = render_state(viewer, wait_ms=6000)
+        assert not state["pageErrors"], state["pageErrors"]
+
     def test_raster_tile_route_serves_png(self, bounded_tif):
         viewer = cesiumkit.Viewer()
         raster = viewer.add_raster(bounded_tif)

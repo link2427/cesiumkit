@@ -88,6 +88,7 @@ async function render({ model, el }) {
     _evalAll(viewer, state.sceneStatements);
     _evalAll(viewer, state.globeStatements);
     _evalAll(viewer, state.clockStatements);
+    _evalAll(viewer, state.imageryStatements);
     _evalAll(viewer, state.cameraOperations);
 
     for (const entityJs of state.entities || []) {

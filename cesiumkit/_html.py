@@ -63,6 +63,7 @@ class HtmlDocument:
         globe_statements: list[str] | None = None,
         clock_statements: list[str] | None = None,
         clustering_statements: list[str] | None = None,
+        imagery_statements: list[str] | None = None,
         terrain_statement: str | None = None,
         custom_scripts: list[str] | None = None,
     ) -> str:
@@ -88,6 +89,7 @@ class HtmlDocument:
             globe_statements=globe_statements or [],
             clock_statements=clock_statements or [],
             clustering_statements=clustering_statements or [],
+            imagery_statements=imagery_statements or [],
             terrain_statement=terrain_statement,
             custom_scripts=custom_scripts or [],
         )

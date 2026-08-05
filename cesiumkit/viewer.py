@@ -182,6 +182,8 @@ class Viewer:
         self._tilesets: list[Any] = []
         self._raster_sources: dict[str, Any] = {}
         self._primitives: list[Any] = []
+        self._raster_layers: list[dict[str, Any]] = []
+        self._wmts_layers: list[dict[str, Any]] = []
         self._event_handlers: list[EventHandler] = []
         self._custom_scripts: list[str] = []
 
@@ -336,38 +338,101 @@ class Viewer:
             options["classification_type"] = classification_type
         return self.add_primitive(ClassificationPrimitive(**options))
 
-    def add_raster(self, source: Any, *, name: str | None = None) -> Any:
+    def add_raster(
+        self,
+        source: Any,
+        *,
+        name: str | None = None,
+        opacity: float = 1.0,
+        maximum_level: int | None = None,
+    ) -> Any:
         """Display a local raster (GeoTIFF/COG path or xarray DataArray).
 
         Requires ``[raster]`` extras (rio-tiler/rasterio/xarray). The raster
-        is served as Web Mercator tiles by the ``show()`` server and set as
-        the viewer's base imagery layer, so it needs a running server (not
-        static HTML export).
+        is served as Web Mercator tiles by the ``show()`` server. The first
+        raster becomes the viewer's base imagery layer; later rasters stack
+        on top of it, each with its own ``opacity`` (0.0 to 1.0). Needs a
+        running server (not static HTML export).
         """
         from cesiumkit.raster import RasterSource
 
+        if not 0.0 <= opacity <= 1.0:
+            raise ValueError("opacity must be between 0.0 and 1.0")
         raster = RasterSource(source, name=name)
         self._raster_sources[raster.id] = raster
         from cesiumkit.imagery import UrlTemplateImageryProvider
 
-        self._viewer_options["base_layer"] = UrlTemplateImageryProvider(
-            url=f"/raster/{raster.id}/{{z}}/{{x}}/{{y}}.png"
+        provider = UrlTemplateImageryProvider(url=f"/raster/{raster.id}/{{z}}/{{x}}/{{y}}.png")
+        if maximum_level is not None:
+            provider = UrlTemplateImageryProvider(
+                url=f"/raster/{raster.id}/{{z}}/{{x}}/{{y}}.png", maximum_level=maximum_level
+            )
+        if not self._raster_layers:
+            self._viewer_options["base_layer"] = provider
+        self._raster_layers.append(
+            {"id": raster.id, "opacity": opacity, "maximum_level": maximum_level}
         )
         return raster
 
-    def add_points(self, gdf: Any, *, aggregation: bool = True, **kwargs: Any) -> Any:
+    def add_wmts_layer(
+        self,
+        url: str,
+        layer: str,
+        *,
+        style: str = "",
+        tile_matrix_set: str = "default",
+        format: str = "image/png",
+        maximum_level: int | None = None,
+        opacity: float = 1.0,
+    ) -> None:
+        """Stack a remote WMTS layer over the current imagery.
+
+        ``layer``/``style``/``tile_matrix_set`` map to the WMTS
+        capabilities for the service at ``url``. The layer is added on top
+        of whatever imagery is already configured, with its own opacity.
+        """
+        if not 0.0 <= opacity <= 1.0:
+            raise ValueError("opacity must be between 0.0 and 1.0")
+        self._wmts_layers.append(
+            {
+                "url": url,
+                "layer": layer,
+                "style": style,
+                "tile_matrix_set": tile_matrix_set,
+                "format": format,
+                "maximum_level": maximum_level,
+                "opacity": opacity,
+            }
+        )
+
+    def add_points(
+        self,
+        gdf: Any,
+        *,
+        aggregation: bool = True,
+        colormap: list[str] | None = None,
+        plot_width: int = 1024,
+        plot_height: int = 512,
+        **kwargs: Any,
+    ) -> Any:
         """Add points from a GeoDataFrame, optionally aggregated via datashader.
 
         With ``aggregation=True`` (default) the points are rasterized with
         datashader (``[datashader]`` extras) into an imagery layer, which
-        stays responsive for millions of points. Pass ``aggregation=False``
-        to fall back to per-point entities.
+        stays responsive for millions of points. ``colormap`` is a list of
+        CSS colors for the shading ramp. Pass ``aggregation=False`` to fall
+        back to per-point entities.
         """
         if not aggregation:
             return self.add_geodataframe(gdf, **kwargs)
         from cesiumkit.raster import aggregate_points_to_raster
 
-        path = aggregate_points_to_raster(gdf, **kwargs.pop("aggregate_options", {}))
+        options = dict(kwargs.pop("aggregate_options", {}))
+        if colormap is not None:
+            options["colormap"] = colormap
+        options.setdefault("plot_width", plot_width)
+        options.setdefault("plot_height", plot_height)
+        path = aggregate_points_to_raster(gdf, **options)
         return self.add_raster(path, name=kwargs.pop("name", "points"))
 
     def add_particle_system(self, particle_system: Any = None, **kwargs: Any) -> Any:
@@ -832,6 +897,49 @@ class Viewer:
         """Build JS expressions for event handlers."""
         return [eh.to_js("viewer") for eh in self._event_handlers]
 
+    def _build_raster_statements(self) -> list[str]:
+        """Build JS statements that stack raster and WMTS imagery layers.
+
+        The first local raster is the base layer (a Viewer constructor
+        option); everything else lands here so layers accumulate in add
+        order with their own opacity instead of replacing each other.
+        """
+        statements: list[str] = []
+        for index, spec in enumerate(self._raster_layers):
+            url = f"/raster/{spec['id']}/{{z}}/{{x}}/{{y}}.png"
+            options = [f"url: {json.dumps(url)}"]
+            if spec["maximum_level"] is not None:
+                options.append(f"maximumLevel: {spec['maximum_level']}")
+            if index == 0:
+                if spec["opacity"] != 1.0:
+                    statements.append(f"viewer.imageryLayers.get(0).alpha = {spec['opacity']};")
+                continue
+            var = f"_rasterLayer{index}"
+            statements.append(
+                f"const {var} = viewer.imageryLayers.addImageryProvider("
+                f"new Cesium.UrlTemplateImageryProvider({{{', '.join(options)}}}));"
+            )
+            if spec["opacity"] != 1.0:
+                statements.append(f"{var}.alpha = {spec['opacity']};")
+        for index, spec in enumerate(self._wmts_layers):
+            options = [
+                f"url: {json.dumps(spec['url'])}",
+                f"layer: {json.dumps(spec['layer'])}",
+                f"style: {json.dumps(spec['style'])}",
+                f"tileMatrixSetID: {json.dumps(spec['tile_matrix_set'])}",
+                f"format: {json.dumps(spec['format'])}",
+            ]
+            if spec["maximum_level"] is not None:
+                options.append(f"maximumLevel: {spec['maximum_level']}")
+            var = f"_wmtsLayer{index}"
+            statements.append(
+                f"const {var} = viewer.imageryLayers.addImageryProvider("
+                f"new Cesium.WebMapTileServiceImageryProvider({{{', '.join(options)}}}));"
+            )
+            if spec["opacity"] != 1.0:
+                statements.append(f"{var}.alpha = {spec['opacity']};")
+        return statements
+
     def _build_scene_statements(self) -> list[str]:
         """Build JS statements for scene configuration."""
         statements: list[str] = []
@@ -886,6 +994,7 @@ class Viewer:
             "clockStatements": self._build_clock_statements(),
             "clusteringStatements": self._build_clustering_statements(),
             "terrainStatement": self._build_terrain_statement(),
+            "imageryStatements": self._build_raster_statements(),
             "customScripts": self._custom_scripts,
         }
 
@@ -918,6 +1027,7 @@ class Viewer:
             globe_statements=self._build_globe_statements(),
             clock_statements=self._build_clock_statements(),
             clustering_statements=self._build_clustering_statements(),
+            imagery_statements=self._build_raster_statements(),
             terrain_statement=self._build_terrain_statement(),
             custom_scripts=self._custom_scripts,
         )

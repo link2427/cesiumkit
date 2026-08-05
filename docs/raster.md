@@ -43,17 +43,49 @@ sets it as the base imagery layer.
 Tiles are served from `/raster/<id>/{z}/{x}/{y}.png` in Web Mercator,
 matching Cesium's default tiling scheme.
 
-## 3. Aggregate a huge point set with datashader
+## 3. Stack layers and tune their opacity
+
+The first raster becomes the base layer; each raster you add after that
+stacks on top of it. Every layer takes its own opacity (0.0 to 1.0) and
+an optional maximum zoom level:
 
 ```python
-viewer.add_points(gdf)  # GeoDataFrame; aggregated to an imagery layer
+viewer.add_raster("elevation.tif", opacity=0.6)
+viewer.add_raster("landcover.tif", name="landcover", opacity=0.8, maximum_level=16)
 ```
 
-With `aggregation=True` (the default) the points are rasterized with
-datashader, which stays responsive for millions of points. Pass
-`aggregation=False` to fall back to one entity per point.
+Remote WMTS services (many national map portals expose one) stack the
+same way with `add_wmts_layer`:
 
-## 4. Stream a GeoDataFrame as CZML instead
+```python
+viewer.add_wmts_layer(
+    "https://example.com/wmts",
+    layer="topo",
+    style="default",
+    tile_matrix_set="EPSG:3857",
+    opacity=0.7,
+)
+```
+
+## 4. Aggregate a huge point set with datashader
+
+With `aggregation=True` (the default) the points are rasterized with
+datashader, which stays responsive for millions of points. `colormap`
+controls the shading ramp, `plot_width`/`plot_height` the aggregation
+canvas:
+
+```python
+viewer.add_points(
+    gdf,
+    colormap=["#000000", "#440154", "#fde725"],
+    plot_width=1024,
+    plot_height=512,
+)
+```
+
+Pass `aggregation=False` to fall back to one entity per point.
+
+## 5. Stream a GeoDataFrame as CZML instead
 
 For moderate-size vector data you can stream batches to the live viewer
 without aggregating:

@@ -89,6 +89,10 @@
         {{ stmt }}
         {% endfor %}
 
+        {% for stmt in imagery_statements %}
+        {{ stmt }}
+        {% endfor %}
+
         {% for entity_js in entities %}
         viewer.entities.add({{ entity_js }});
         {% endfor %}

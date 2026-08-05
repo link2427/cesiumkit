@@ -192,6 +192,73 @@ class TestFullHtmlOutput:
         assert "scene.requestRenderMode = true" in html
         assert "scene.maximumRenderTimeChange = 1.5" in html
 
+    def test_scene_config_fog_atmosphere_msaa(self):
+        viewer = cesiumkit.Viewer(
+            scene=cesiumkit.SceneConfig(
+                fog_density=0.001,
+                fog_minimum_brightness=0.2,
+                fog_screen_space_error_factor=2.0,
+                atmosphere_brightness_shift=0.1,
+                atmosphere_hue_shift=0.2,
+                atmosphere_saturation_shift=-0.1,
+                msaa_samples=4,
+            )
+        )
+        html = viewer.to_html()
+        assert "scene.fog.density = 0.001" in html
+        assert "scene.fog.minimumBrightness = 0.2" in html
+        assert "scene.fog.screenSpaceErrorFactor = 2.0" in html
+        assert "scene.skyAtmosphere.brightnessShift = 0.1" in html
+        assert "scene.skyAtmosphere.hueShift = 0.2" in html
+        assert "scene.skyAtmosphere.saturationShift = -0.1" in html
+        assert "scene.msaaSamples = 4" in html
+
+    def test_scene_config_validation(self):
+        with pytest.raises(ValidationError):
+            cesiumkit.SceneConfig(fog_density=0)
+        with pytest.raises(ValidationError):
+            cesiumkit.SceneConfig(fog_minimum_brightness=1.5)
+        with pytest.raises(ValidationError):
+            cesiumkit.SceneConfig(atmosphere_hue_shift=2)
+        with pytest.raises(ValidationError):
+            cesiumkit.SceneConfig(msaa_samples=0)
+
+    def test_viewer_shadow_options(self):
+        viewer = cesiumkit.Viewer(
+            scene3d_only=True,
+            shadows=cesiumkit.ShadowMode.ENABLED,
+            terrain_shadows=cesiumkit.ShadowMode.RECEIVE_ONLY,
+        )
+        html = viewer.to_html()
+        assert "scene3DOnly: true" in html
+        assert "shadows: Cesium.ShadowMode.ENABLED" in html
+        assert "terrainShadows: Cesium.ShadowMode.RECEIVE_ONLY" in html
+
+    def test_viewer_shadow_options_omitted_by_default(self):
+        html = cesiumkit.Viewer().to_html()
+        assert "scene3DOnly" not in html
+        assert "terrainShadows" not in html
+
+    def test_scene_options_render(self):
+        from cesiumkit import _vendor
+
+        if _vendor.vendor_dir() is None:
+            pytest.skip("bundled Cesium build not present")
+        from cesiumkit.testing import render_state
+
+        viewer = cesiumkit.Viewer(
+            scene3d_only=False,
+            shadows=cesiumkit.ShadowMode.ENABLED,
+            scene=cesiumkit.SceneConfig(
+                fog_density=0.0002,
+                fog_minimum_brightness=0.5,
+                atmosphere_hue_shift=0.1,
+                msaa_samples=4,
+            ),
+        )
+        state = render_state(viewer, wait_ms=6000)
+        assert not state["pageErrors"], state["pageErrors"]
+
     def test_post_process_configuration(self):
         viewer = cesiumkit.Viewer(
             scene=cesiumkit.SceneConfig(

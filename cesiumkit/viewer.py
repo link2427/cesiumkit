@@ -27,7 +27,7 @@ from cesiumkit.camera import Camera
 from cesiumkit.clock import ClockConfig
 from cesiumkit.clustering import EntityClusterConfig
 from cesiumkit.czml import CzmlDocument
-from cesiumkit.enums import SceneMode, ScreenSpaceEventType
+from cesiumkit.enums import SceneMode, ScreenSpaceEventType, ShadowMode
 from cesiumkit.events import EventHandler
 from cesiumkit.globe import GlobeConfig
 from cesiumkit.imagery import ImageryProvider
@@ -81,6 +81,9 @@ class Viewer:
         show_renderer_errors: bool | None = None,
         # Scene
         scene_mode: SceneMode | None = None,
+        scene3d_only: bool | None = None,
+        shadows: ShadowMode | None = None,
+        terrain_shadows: ShadowMode | None = None,
         scene: SceneConfig | None = None,
         # Globe
         globe: GlobeConfig | None = None,
@@ -129,6 +132,8 @@ class Viewer:
             "maximum_render_time_change": maximum_render_time_change,
             "target_frame_rate": target_frame_rate,
             "show_render_loop_errors": show_renderer_errors,
+            "shadows": shadows,
+            "terrain_shadows": terrain_shadows,
         }
         for key, val in opt_map.items():
             if val is not None:
@@ -142,6 +147,11 @@ class Viewer:
             self._terrain_provider = None
         if imagery_provider is not None:
             self._viewer_options["base_layer"] = imagery_provider
+
+        # camelize() would emit `scene3dOnly`, but Cesium's option keeps the
+        # capital D, so this one gets set under its exact JS name.
+        if scene3d_only is not None:
+            self._viewer_options["scene3DOnly"] = scene3d_only
 
         if maximum_render_time_change is not None and (
             not math.isfinite(maximum_render_time_change) or maximum_render_time_change < 0

@@ -61,6 +61,28 @@ viewer.add_classification(
 )
 ```
 
+## Fog, atmosphere, and antialiasing
+
+`SceneConfig` exposes the stable scene-quality knobs that don't change the
+viewer's construction:
+
+```python
+scene = cesiumkit.SceneConfig(
+    fog_density=0.0002,
+    fog_minimum_brightness=0.5,
+    atmosphere_hue_shift=0.1,
+    atmosphere_saturation_shift=-0.05,
+    msaa_samples=4,
+)
+viewer = cesiumkit.Viewer(scene=scene)
+```
+
+- `fog_*` maps to `scene.fog` (density, minimum brightness, screen-space
+  error factor).
+- `atmosphere_*` maps to `scene.skyAtmosphere` (brightness/hue/saturation
+  shifts, each in `[-1, 1]`).
+- `msaa_samples` sets `scene.msaaSamples` (1-16).
+
 ## Rendering performance
 
 Viewer constructor controls expose explicit rendering, resolution scaling,

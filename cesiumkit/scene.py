@@ -201,6 +201,13 @@ class SceneConfig(CesiumBase):
     sun: bool | None = None
     moon: bool | None = None
     fog_enabled: bool | None = None
+    fog_density: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    fog_minimum_brightness: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
+    fog_screen_space_error_factor: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    atmosphere_brightness_shift: float | None = Field(default=None, ge=-1, le=1, allow_inf_nan=False)
+    atmosphere_hue_shift: float | None = Field(default=None, ge=-1, le=1, allow_inf_nan=False)
+    atmosphere_saturation_shift: float | None = Field(default=None, ge=-1, le=1, allow_inf_nan=False)
+    msaa_samples: int | None = Field(default=None, ge=1, le=16)
     background_color: Any = None
     order_independent_translucency: bool | None = None
     request_render_mode: bool | None = None
@@ -225,6 +232,22 @@ class SceneConfig(CesiumBase):
             statements.append(f"{viewer_var}.scene.moon.show = {str(self.moon).lower()};")
         if self.fog_enabled is not None:
             statements.append(f"{viewer_var}.scene.fog.enabled = {str(self.fog_enabled).lower()};")
+        if self.fog_density is not None:
+            statements.append(f"{viewer_var}.scene.fog.density = {self.fog_density};")
+        if self.fog_minimum_brightness is not None:
+            statements.append(f"{viewer_var}.scene.fog.minimumBrightness = {self.fog_minimum_brightness};")
+        if self.fog_screen_space_error_factor is not None:
+            statements.append(f"{viewer_var}.scene.fog.screenSpaceErrorFactor = {self.fog_screen_space_error_factor};")
+        if self.atmosphere_brightness_shift is not None:
+            statements.append(f"{viewer_var}.scene.skyAtmosphere.brightnessShift = {self.atmosphere_brightness_shift};")
+        if self.atmosphere_hue_shift is not None:
+            statements.append(f"{viewer_var}.scene.skyAtmosphere.hueShift = {self.atmosphere_hue_shift};")
+        if self.atmosphere_saturation_shift is not None:
+            statements.append(
+                f"{viewer_var}.scene.skyAtmosphere.saturationShift = {self.atmosphere_saturation_shift};"
+            )
+        if self.msaa_samples is not None:
+            statements.append(f"{viewer_var}.scene.msaaSamples = {self.msaa_samples};")
         if self.background_color is not None:
             statements.append(f"{viewer_var}.scene.backgroundColor = {to_js_value(self.background_color)};")
         if self.order_independent_translucency is not None:

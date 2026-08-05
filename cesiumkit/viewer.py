@@ -110,6 +110,13 @@ class Viewer:
         self.width = width
         self.height = height
         self.cesium_version = cesium_version or DEFAULT_CESIUM_VERSION
+        if cesium_version is not None:
+            from cesiumkit._deprecations import warn_deprecated
+
+            warn_deprecated(
+                "Viewer(cesium_version=...)",
+                alternative="omit the argument; cesiumkit uses the bundled, pinned Cesium build",
+            )
         self.title = title
 
         # Viewer options

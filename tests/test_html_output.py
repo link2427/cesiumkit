@@ -13,7 +13,6 @@ class TestFullHtmlOutput:
             ion_token="test_token",
             animation=False,
             timeline=False,
-            cesium_version="1.119",
         )
 
         # Point entity

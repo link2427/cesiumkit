@@ -32,6 +32,18 @@ jobs:
       - run: pip install ".[dev,gis]"
       - run: pytest --cov=cesiumkit --cov-fail-under=75
 
+  # Deprecation gate: the suite must pass with DeprecationWarning as an
+  # error, so internal use of a deprecated API (or a regression) fails CI.
+  deprecations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install ".[dev,gis]"
+      - run: pytest -W error::DeprecationWarning --cov=cesiumkit --cov-fail-under=75
+
   # Docstring drift guard: any broken ``` >>> ``` example in the package
   # fails this job. Needs every optional extra so all modules import.
   doctest:

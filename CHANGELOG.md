@@ -4,6 +4,57 @@ All notable changes to cesiumkit are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.0.0] - 2026-08-05
+
+Stability contract: the public API is frozen from here on. Breaking
+changes require a major version bump, and deprecations are announced at
+least one minor release ahead (see CONTRIBUTING.md).
+
+### Added
+
+- **Clipping planes.** `ClippingPlane` and `ClippingPlaneCollection`
+  configs clip tilesets, 3D models, and the globe itself, with
+  intersection/union combining and on/off control.
+- **Classification.** `ClassificationPrimitive` (and the
+  `viewer.add_classification()` helper) draws filled polygons that drape
+  over terrain or 3D Tiles, targeting `TERRAIN`, `CESIUM_3D_TILE`, or
+  `BOTH`.
+- **Scene quality knobs.** `SceneConfig` gained fog density / minimum
+  brightness / screen-space error factor, sky-atmosphere
+  brightness/hue/saturation shifts, and `msaa_samples`. The Viewer
+  constructor gained `shadows`, `terrain_shadows` (ShadowMode), and
+  `scene3d_only`.
+- **Raster layering.** `add_raster` now stacks: the first raster is the
+  base layer, later ones accumulate with per-layer `opacity` and
+  `maximum_level`. New `add_wmts_layer()` stacks remote WMTS services;
+  `add_points()` exposes `colormap` and canvas size directly.
+- **Render coverage in CI.** Every entity graphics type (17) plus the
+  tileset graphics renders headlessly in the render-check job, and a
+  combined test loads all of them at once.
+- **Benchmarks.** `scripts/benchmark.py` adds raster throughput and
+  optional headless page-load timing.
+
+### Changed
+
+- Development status classifier moved to `5 - Production/Stable`.
+- `Cartesian3FromDegrees` is now a `Cartesian3` subclass, so degree-based
+  positions flow through every `Cartesian3`-typed field.
+
+### Removed
+
+- `Viewer(cesium_version=...)` (deprecated in 0.8.0; the viewer always
+  uses the bundled, pinned Cesium build).
+- `OpenStreetMapImageryProvider` (deprecated in 0.8.0; use
+  `UrlTemplateImageryProvider`). See the migration guide.
+
+### Performance
+
+Measured with `scripts/benchmark.py` on this release:
+
+- `to_html()`: 1k entities 0.05s, 10k 0.22s, 50k 0.74s (7.2 MB HTML)
+- raster tile: ~9 ms render, ~0 ms cache hit, ~1000 tiles/s
+- headless page load + settle: 6.1s at 1k entities, 18.3s at 50k
+
 ## [0.9.0] - 2026-08-05
 
 ### Added

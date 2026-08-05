@@ -243,9 +243,7 @@ class SceneConfig(CesiumBase):
         if self.atmosphere_hue_shift is not None:
             statements.append(f"{viewer_var}.scene.skyAtmosphere.hueShift = {self.atmosphere_hue_shift};")
         if self.atmosphere_saturation_shift is not None:
-            statements.append(
-                f"{viewer_var}.scene.skyAtmosphere.saturationShift = {self.atmosphere_saturation_shift};"
-            )
+            statements.append(f"{viewer_var}.scene.skyAtmosphere.saturationShift = {self.atmosphere_saturation_shift};")
         if self.msaa_samples is not None:
             statements.append(f"{viewer_var}.scene.msaaSamples = {self.msaa_samples};")
         if self.background_color is not None:

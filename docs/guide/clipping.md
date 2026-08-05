@@ -17,9 +17,7 @@ import cesiumkit
 planes = cesiumkit.ClippingPlaneCollection(
     planes=[
         cesiumkit.ClippingPlane(
-            position=cesiumkit.Cartesian3FromDegrees(
-                longitude=-74.0, latitude=40.7, height=0
-            ),
+            position=cesiumkit.Cartesian3FromDegrees(longitude=-74.0, latitude=40.7, height=0),
             normal=cesiumkit.Cartesian3(x=0, y=0, z=1),  # up: keep everything below
         )
     ]
@@ -45,9 +43,7 @@ viewer.add_entity(
 )
 
 # or clip the whole globe at a plane
-viewer = cesiumkit.Viewer(
-    globe=cesiumkit.GlobeConfig(clipping_planes=planes)
-)
+viewer = cesiumkit.Viewer(globe=cesiumkit.GlobeConfig(clipping_planes=planes))
 ```
 
 A normal of `(0, 0, 1)` at a position keeps the hemisphere below that

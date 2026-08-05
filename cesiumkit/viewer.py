@@ -369,9 +369,7 @@ class Viewer:
             )
         if not self._raster_layers:
             self._viewer_options["base_layer"] = provider
-        self._raster_layers.append(
-            {"id": raster.id, "opacity": opacity, "maximum_level": maximum_level}
-        )
+        self._raster_layers.append({"id": raster.id, "opacity": opacity, "maximum_level": maximum_level})
         return raster
 
     def add_wmts_layer(

@@ -59,8 +59,6 @@ class Viewer:
         container_id: str = "cesiumContainer",
         width: str = "100%",
         height: str = "100%",
-        # Cesium version
-        cesium_version: str | None = None,
         # Title
         title: str = "cesiumkit",
         # Viewer constructor options
@@ -109,14 +107,6 @@ class Viewer:
         self.container_id = container_id
         self.width = width
         self.height = height
-        self.cesium_version = cesium_version or DEFAULT_CESIUM_VERSION
-        if cesium_version is not None:
-            from cesiumkit._deprecations import warn_deprecated
-
-            warn_deprecated(
-                "Viewer(cesium_version=...)",
-                alternative="omit the argument; cesiumkit uses the bundled, pinned Cesium build",
-            )
         self.title = title
 
         # Viewer options
@@ -866,10 +856,10 @@ class Viewer:
 
         Args:
             cesium_base_url: URL prefix of the directory containing Cesium.js.
-                None loads Cesium from the CDN at self.cesium_version.
+                None loads Cesium from the CDN at the pinned DEFAULT_CESIUM_VERSION.
         """
         doc = HtmlDocument(
-            cesium_version=self.cesium_version,
+            cesium_version=DEFAULT_CESIUM_VERSION,
             cesium_base_url=cesium_base_url,
             ion_token=self.ion_token,
             width=self.width,
@@ -1088,7 +1078,7 @@ class Viewer:
     def _repr_html_(self) -> str:
         """Jupyter notebook display (HTML iframe)."""
         doc = HtmlDocument(
-            cesium_version=self.cesium_version,
+            cesium_version=DEFAULT_CESIUM_VERSION,
             ion_token=self.ion_token,
             width=self.width,
             height=self.height,

@@ -76,11 +76,10 @@ class TestViewer:
         html = v.to_html()
         assert html.count("viewer.entities.add") == 2
 
-    def test_cesium_version(self):
-        with pytest.warns(DeprecationWarning):
-            v = cesiumkit.Viewer(cesium_version="1.115")
-        html = v.to_html()
-        assert "releases/1.115/" in html
+    def test_cesium_version_rejected(self):
+        # the escape hatch was removed in 1.0; the bundled build is pinned
+        with pytest.raises(TypeError):
+            cesiumkit.Viewer(cesium_version="1.115")
 
     def test_default_cesium_version(self):
         html = cesiumkit.Viewer().to_html()

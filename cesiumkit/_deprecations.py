@@ -33,8 +33,8 @@ def warn_deprecated(
     """Emit a DeprecationWarning naming the removal release.
 
     Args:
-        what: The deprecated thing, e.g. ``Viewer(cesium_version=...)``.
-        alternative: What to use instead, e.g. ``show(cesium_version=...)``.
+        what: The deprecated thing, e.g. ``Viewer(old_option=...)``.
+        alternative: What to use instead, e.g. ``Viewer(new_option=...)``.
         removal: The release that removes the feature (default "1.0").
     """
     warnings.warn(

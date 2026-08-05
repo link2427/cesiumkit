@@ -15,7 +15,8 @@ at 1.0.
 ## Removed at 1.0
 
 These were deprecated in 0.8.0 and are removed in 1.0.0. Both still work
-in 0.9 with a `DeprecationWarning`.
+in 0.9 with a `DeprecationWarning`; in 1.0 they are gone and the
+alternatives below are the supported paths.
 
 ### 1. `Viewer(cesium_version=...)`
 

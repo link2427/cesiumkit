@@ -36,30 +36,6 @@ class BingMapsImageryProvider(ImageryProvider):
         return "Cesium.BingMapsImageryProvider"
 
 
-class OpenStreetMapImageryProvider(ImageryProvider):
-    """Provides imagery from OpenStreetMap tile servers.
-
-    Deprecated in 0.8: CesiumJS deprecates this provider in favor of
-    :class:`UrlTemplateImageryProvider`. Will be removed in 1.0.
-    """
-
-    url: str = "https://tile.openstreetmap.org/"
-    file_extension: str = "png"
-    maximum_level: int | None = None
-
-    def __init__(self, **data: Any) -> None:
-        from cesiumkit._deprecations import warn_deprecated
-
-        warn_deprecated(
-            "OpenStreetMapImageryProvider",
-            alternative="UrlTemplateImageryProvider",
-        )
-        super().__init__(**data)
-
-    def _js_class_name(self) -> str:
-        return "Cesium.OpenStreetMapImageryProvider"
-
-
 class TileMapServiceImageryProvider(ImageryProvider):
     """Provides imagery from a TMS (Tile Map Service) server."""
 
@@ -122,7 +98,6 @@ __all__ = [
     "BingMapsImageryProvider",
     "ImageryProvider",
     "IonImageryProvider",
-    "OpenStreetMapImageryProvider",
     "SingleTileImageryProvider",
     "TileMapServiceImageryProvider",
     "UrlTemplateImageryProvider",

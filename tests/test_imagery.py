@@ -6,7 +6,6 @@ from pydantic import ValidationError
 from cesiumkit.imagery import (
     BingMapsImageryProvider,
     IonImageryProvider,
-    OpenStreetMapImageryProvider,
     SingleTileImageryProvider,
     UrlTemplateImageryProvider,
     WebMapServiceImageryProvider,
@@ -31,14 +30,6 @@ class TestBingMapsImageryProvider:
     def test_key_required(self):
         with pytest.raises(ValidationError):
             BingMapsImageryProvider()
-
-
-class TestOpenStreetMapImageryProvider:
-    def test_to_js(self):
-        with pytest.warns(DeprecationWarning):
-            p = OpenStreetMapImageryProvider()
-        js = p.to_js()
-        assert "OpenStreetMapImageryProvider" in js
 
 
 class TestUrlTemplateImageryProvider:

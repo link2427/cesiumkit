@@ -21,12 +21,23 @@ theme:
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+    admonition:
+      note: octicons/tag-16
+      tip: octicons/light-bulb-16
+      example: octicons/beaker-16
   features:
     - navigation.sections
-    - navigation.expand
+    - navigation.indexes
+    - navigation.instant
+    - navigation.footer
     - navigation.top
     - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
     - search.highlight
+    - search.suggest
 
 plugins:
   - search
@@ -42,6 +53,17 @@ plugins:
             show_symbol_type_heading: true
             show_symbol_type_toc: true
             docstring_style: google
+            separate_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+            merge_init_into_class: true
+            annotations_path: brief
+            modernize_annotations: true
+            line_length: 80
+            summary: true
+            docstring_options:
+              ignore_init_summary: true
+              trim_doctest_flags: true
 
 markdown_extensions:
   - admonition
@@ -49,8 +71,17 @@ markdown_extensions:
   - md_in_html
   - pymdownx.details
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds: {case: lower}
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.highlight:
       anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
   - pymdownx.inlinehilite
   - toc:
       permalink: true
@@ -59,15 +90,33 @@ nav:
   - Home: index.md
   - Getting Started: getting-started.md
   - Tutorial: tutorial.md
-  - Troubleshooting: troubleshooting.md
-  - Architecture: architecture.md
-  - Runtime Control: runtime-control.md
-  - Jupyter Widget: widget.md
-  - GeoPandas & Shapely: getting-started-gis.md
-  - Rasters & Large Data: raster.md
+  - Guide:
+      - guide/index.md
+      - How to plot a GeoDataFrame: getting-started-gis.md
+      - How to control a live viewer: runtime-control.md
+      - How to use the Jupyter widget: widget.md
+      - How to display rasters and large point data: raster.md
+  - Examples:
+      - examples/index.md
+      - examples/01_basic_point.md
+      - examples/02_shapes_and_materials.md
+      - examples/03_multiple_cities.md
+      - examples/04_time_dynamic_satellite.md
+      - examples/05_geojson_and_datasources.md
+      - examples/06_terrain_and_imagery.md
+      - examples/07_3d_models_and_tilesets.md
+      - examples/08_czml_export.md
+      - examples/09_camera_controls.md
+      - examples/10_event_handlers.md
+      - examples/11_runtime_control.md
   - Gallery: gallery.md
-  - Examples: examples.md
+  - Reference:
+      - reference/index.md
+      - Troubleshooting: troubleshooting.md
+      - Architecture: architecture.md
+      - Migration Guide: migration.md
   - API Reference:
+      - api/index.md
       - Viewer: api/viewer.md
       - Entity: api/entities.md
       - Coordinates & Math: api/coordinates.md

@@ -3,6 +3,11 @@
 _How-to. Target: a local `show()` viewer with a point and a polygon, running
 offline-friendly, in about 20 lines._
 
+!!! tip "Looking for something else?"
+    - GeoPandas data on the globe? Skip to [How to plot a GeoDataFrame](getting-started-gis.md).
+    - A notebook widget? Skip to [How to use the Jupyter widget](widget.md).
+    - Big rasters or point clouds? Skip to [How to display rasters and large point data](raster.md).
+
 ## 1. Install
 
 ```bash
@@ -18,15 +23,18 @@ includes a bundled Cesium build, so it also works fully offline (see
 ```python
 import cesiumkit
 
-viewer = cesiumkit.Viewer(title="Hello Globe")
+viewer = cesiumkit.Viewer(title="Hello Globe")  # (1)!
 viewer.add_entity(
     cesiumkit.Entity(
         name="New York",
-        position=cesiumkit.Cartesian3.from_degrees(-74.006, 40.7128, 400),
+        position=cesiumkit.Cartesian3.from_degrees(-74.006, 40.7128, 400),  # (2)!
         point=cesiumkit.PointGraphics(pixel_size=12, color=cesiumkit.Color.RED),
     )
 )
 ```
+
+1.  Builds a `Viewer` — nothing is shown yet.
+2.  `from_degrees` takes longitude, latitude, and altitude in meters.
 
 ## 3. Add a polygon
 
@@ -42,11 +50,13 @@ viewer.add_entity(
                 cesiumkit.Cartesian3.from_degrees(-77.035, 38.905),
             ],
             material=cesiumkit.Color.CORNFLOWERBLUE.with_alpha(0.6),
-            extruded_height=200,
+            extruded_height=200,  # (1)!
         ),
     )
 )
 ```
+
+1.  `extruded_height` lifts the polygon off the ground, making it a 3D prism.
 
 ## 4. Show it
 
@@ -69,7 +79,7 @@ cesiumkit.Ion.set_default_token("your-token-here")
 
 ## 6. See what's next
 
-- Browse the [Examples](examples.md) for common patterns
+- Browse the [Examples](examples/index.md) for common patterns
 - Explore the [API Reference](api/viewer.md) for all available classes
 - Follow the [Flight tracker tutorial](tutorial.md) to build something
   multi-step

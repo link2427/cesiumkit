@@ -1,17 +1,40 @@
 # cesiumkit
 
-**Build CesiumJS 3D globe visualizations entirely in Python.**
+**3D globe visualizations in Python** — entities, materials, camera, terrain,
+imagery, and time-dynamic animation, rendered in your browser via
+[CesiumJS](https://cesium.com/cesiumjs/).
 
-[![Docs](https://img.shields.io/badge/docs-link2427.github.io%2Fcesiumkit-blue)](https://link2427.github.io/cesiumkit)
-[![CI](https://github.com/link2427/cesiumkit/actions/workflows/ci.yml/badge.svg)](https://github.com/link2427/cesiumkit/actions/workflows/ci.yml)
-[![Coverage](https://link2427.github.io/cesiumkit/coverage.svg)](https://link2427.github.io/cesiumkit)
 [![PyPI version](https://img.shields.io/pypi/v/cesiumkit.svg)](https://pypi.org/project/cesiumkit/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-
-cesiumkit gives you a Pythonic, object-oriented API for [CesiumJS](https://cesium.com/cesiumjs/) -- the leading open-source JavaScript library for 3D globes and maps. Define entities, materials, camera views, terrain, imagery, and time-dynamic animations in pure Python, then render them in the browser with a single call.
+[![Python versions](https://img.shields.io/pypi/pyversions/cesiumkit.svg)](https://pypi.org/project/cesiumkit/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/link2427/cesiumkit/actions/workflows/ci.yml/badge.svg)](https://github.com/link2427/cesiumkit/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/website-up-down-green-red/https/link2427.github.io/cesiumkit.svg)](https://link2427.github.io/cesiumkit)
+[![Coverage](https://link2427.github.io/cesiumkit/coverage.svg)](https://link2427.github.io/cesiumkit)
 
 ![Globe hero](https://link2427.github.io/cesiumkit/images/gallery/01_globe_hero.png)
+*A globe rendered with cesiumkit — one `show()` call opens it in your browser.*
+
+## What it is
+
+cesiumkit is a Pythonic, object-oriented API for
+[CesiumJS](https://cesium.com/cesiumjs/), the open-source JavaScript library
+for 3D globes and maps. Define entities, materials, camera views, terrain,
+imagery, and time-dynamic animations in pure Python; the library generates
+the page and serves it locally. It plays the same role for 3D globe data
+that libraries like folium play for 2D maps.
+
+- **17 entity graphics types** and 9 materials, all as validated Pydantic models
+- **Time-dynamic animation** with sampled properties and a clock
+- **GeoPandas / Shapely**: drop a `GeoDataFrame` on the globe in one call
+- **Rasters & large data**: local GeoTIFFs and datashader-aggregated point sets
+- **Live control**: drive the clock, update data, and receive clicks from Python
+- **Offline-friendly**: the wheel bundles a Cesium build, so `show()` works without the CDN
+
+## Quickstart
+
+```bash
+pip install cesiumkit
+```
 
 ```python
 import cesiumkit
@@ -24,287 +47,58 @@ viewer.add_entity(
         point=cesiumkit.PointGraphics(pixel_size=12, color=cesiumkit.Color.RED),
     )
 )
-viewer.show()  # opens in your browser
+viewer.show()  # opens in your browser; Ctrl+C to stop the server
 ```
 
-<p align="center">
-  <em>That's it -- 6 lines from Python to a 3D globe in the browser.</em>
-</p>
+Requires Python 3.10+. The published wheel bundles a Cesium build, so
+`show()` works fully offline out of the box.
 
 ## Gallery
 
 | | | |
 |---|---|---|
-| [![Shapes](https://link2427.github.io/cesiumkit/images/gallery/02_shapes.png)](https://link2427.github.io/cesiumkit/gallery/) | [![Cities](https://link2427.github.io/cesiumkit/images/gallery/03_cities.png)](https://link2427.github.io/cesiumkit/gallery/) | [![Flight path](https://link2427.github.io/cesiumkit/images/gallery/04_flight_path.png)](https://link2427.github.io/cesiumkit/gallery/) |
-| [![GeoPandas](https://link2427.github.io/cesiumkit/images/gallery/05_geopandas.png)](https://link2427.github.io/cesiumkit/gallery/) | [![Extruded polygons](https://link2427.github.io/cesiumkit/images/gallery/06_polygon_3d.png)](https://link2427.github.io/cesiumkit/gallery/) | [More →](https://link2427.github.io/cesiumkit/gallery/) |
+| [![Shapes](https://link2427.github.io/cesiumkit/images/gallery/02_shapes.png)](https://link2427.github.io/cesiumkit/gallery/) *Shapes & materials* | [![Cities](https://link2427.github.io/cesiumkit/images/gallery/03_cities.png)](https://link2427.github.io/cesiumkit/gallery/) *Cities* | [![Flight path](https://link2427.github.io/cesiumkit/images/gallery/04_flight_path.png)](https://link2427.github.io/cesiumkit/gallery/) *Flight path* |
+| [![GeoPandas](https://link2427.github.io/cesiumkit/images/gallery/05_geopandas.png)](https://link2427.github.io/cesiumkit/gallery/) *GeoPandas* | [![Extruded polygons](https://link2427.github.io/cesiumkit/images/gallery/06_polygon_3d.png)](https://link2427.github.io/cesiumkit/gallery/) *Extruded polygons* | [More →](https://link2427.github.io/cesiumkit/gallery/) |
 
----
+## Documentation
 
-## Install
+- [Getting started](https://link2427.github.io/cesiumkit/getting-started/) — install and your first globe
+- [Tutorial](https://link2427.github.io/cesiumkit/tutorial/) — build a flight tracker step by step
+- [Guide](https://link2427.github.io/cesiumkit/guide/) — GeoPandas, rasters, live control, Jupyter widget
+- [Examples](https://link2427.github.io/cesiumkit/examples/) — 11 runnable scripts, one page each
+- [API reference](https://link2427.github.io/cesiumkit/api/) — type-annotated, with doctested examples
+- [Changelog](CHANGELOG.md)
+
+## Extras & offline use
+
+Optional features ship as install extras:
 
 ```bash
-pip install cesiumkit
+pip install "cesiumkit[gis]"         # GeoPandas / Shapely integration
+pip install "cesiumkit[raster]"      # local GeoTIFF / COG / DataArray tiles
+pip install "cesiumkit[datashader]"  # aggregate millions of points
+pip install "cesiumkit[widget]"      # Jupyter widget (anywidget)
 ```
-
-Requires Python 3.10+. No external binary dependencies.
-
-For GeoPandas / Shapely support:
-
-```bash
-pip install cesiumkit[gis]
-```
-
-### Offline use
 
 By default the generated pages load CesiumJS from the CDN. To run fully
 offline (air-gapped machines, CI, headless servers), vendor the Cesium build
-once and `show()` will serve it locally, including the NaturalEarthII
-fallback imagery:
+once — the wheel published to PyPI already includes it:
 
 ```bash
 python scripts/fetch_cesium.py   # downloads the CesiumJS 1.144 release (~120 MB)
 ```
 
-The wheel built by the PyPI publish workflow includes the vendored build, so
-`pip install cesiumkit` works offline out of the box after that point.
-Static HTML export and Jupyter embedding still load from the CDN.
-
-## Features
-
-### GeoPandas / Shapely integration
-
-Drop a `GeoDataFrame` onto the globe in one call. Auto-reprojects to WGS84,
-handles mixed geometry types, supports per-feature styling from columns.
-
-```python
-import geopandas as gpd
-import cesiumkit
-
-gdf = gpd.read_file("countries.geojson")
-viewer = cesiumkit.Viewer()
-viewer.add_geodataframe(
-    gdf,
-    name_column="NAME",
-    color_column="color_hex",
-    extruded_height_column="gdp",  # polygons become 3D prisms
-    fill_alpha=0.5,
-)
-viewer.show()
-```
-
-Shapely geometries are also auto-converted anywhere cesiumkit expects
-positions — pass a `shapely.Point` directly to `Entity(position=...)` or a
-`shapely.Polygon` to `PolygonGraphics(hierarchy=...)`.
-
-### Entities with rich graphics
-
-Points, billboards, labels, polygons, polylines, boxes, cylinders, ellipses, ellipsoids, corridors, walls, rectangles, paths, polyline volumes, and 3D models -- all as clean Python objects.
-
-```python
-viewer.add_entity(
-    cesiumkit.Entity(
-        name="Headquarters",
-        position=cesiumkit.Cartesian3.from_degrees(-77.0369, 38.9072, 0),
-        polygon=cesiumkit.PolygonGraphics(
-            hierarchy=[
-                cesiumkit.Cartesian3.from_degrees(-77.04, 38.91),
-                cesiumkit.Cartesian3.from_degrees(-77.03, 38.91),
-                cesiumkit.Cartesian3.from_degrees(-77.035, 38.905),
-            ],
-            material=cesiumkit.Color.CORNFLOWERBLUE.with_alpha(0.6),
-            extruded_height=200,
-        ),
-    )
-)
-```
-
-### Materials
-
-Solid colors, images, grids, stripes, checkerboards, and polyline-specific materials (glow, arrow, dash, outline).
-
-```python
-cesiumkit.StripeMaterial(
-    orientation=cesiumkit.StripeOrientation.HORIZONTAL,
-    even_color=cesiumkit.Color.WHITE,
-    odd_color=cesiumkit.Color.BLUE,
-    repeat=5,
-)
-```
-
-### Time-dynamic animation
-
-Animate entities along paths using sampled position properties with configurable interpolation.
-
-```python
-prop = cesiumkit.SampledPositionProperty(interpolation_degree=2)
-prop.add_sample(
-    cesiumkit.JulianDate.from_iso8601("2024-01-01T00:00:00Z"), cesiumkit.Cartesian3.from_degrees(-122.4, 37.8, 10000)
-)
-prop.add_sample(
-    cesiumkit.JulianDate.from_iso8601("2024-01-01T01:00:00Z"), cesiumkit.Cartesian3.from_degrees(-73.9, 40.7, 10000)
-)
-entity = cesiumkit.Entity(
-    name="Flight", position=prop, path=cesiumkit.PathGraphics(width=2, material=cesiumkit.Color.YELLOW)
-)
-```
-
-### Live runtime control
-
-Control a running viewer from Python: update the clock and data sources,
-select or pick entities, receive click callbacks, and capture screenshots.
-
-```python
-viewer.set_time("2026-07-14T18:00:00Z")
-viewer.set_multiplier(60)
-viewer.animate(True)
-viewer.on_click(lambda entity_id: print("clicked", entity_id))
-```
-
-See the [runtime control guide](https://link2427.github.io/cesiumkit/runtime-control/)
-for the server lifecycle and complete examples.
-
-### Data sources
-
-Load GeoJSON, CZML, and KML directly.
-
-```python
-viewer.add_data_source(
-    cesiumkit.GeoJsonDataSource(
-        url="https://example.com/data.geojson",
-        stroke=cesiumkit.Color.RED,
-        fill=cesiumkit.Color.RED.with_alpha(0.3),
-    )
-)
-```
-
-### Camera control
-
-Fly to locations, set fixed viewpoints, or lock the camera to a target.
-
-```python
-viewer.fly_to(
-    cesiumkit.Cartesian3.from_degrees(2.2945, 48.8584, 1000),
-    orientation=cesiumkit.HeadingPitchRoll(heading=0.3, pitch=-0.4, roll=0),
-    duration=3.0,
-)
-```
-
-### CZML export
-
-Build visualizations in Python and export to CZML for use in any CesiumJS application.
-
-```python
-czml_string = viewer.to_czml_string(indent=2)
-viewer.save_czml("output.czml")
-```
-
-### Imagery and terrain providers
-
-8 imagery providers (Bing, OpenStreetMap, SingleTile, WMTS, WMS, URL template, Ion, TileMapService) and terrain providers for Cesium Ion, Cesium terrain servers, ellipsoid, and encoded WMS/WMTS heightmaps.
-
-### Cesium Ion integration
-
-```python
-cesiumkit.Ion.set_default_token("your-token-here")
-viewer.add_tileset(ion_asset_id=75343)  # e.g., NYC 3D buildings
-```
-
-### Interactive events
-
-Add click handlers and custom JavaScript for full interactivity.
-
-```python
-viewer.on(
-    cesiumkit.ScreenSpaceEventType.LEFT_CLICK,
-    cesiumkit.JsCode("""function(click) {
-        var picked = viewer.scene.pick(click.position);
-        if (Cesium.defined(picked)) viewer.selectedEntity = picked.id;
-    }"""),
-)
-```
-
----
-
-## Full feature list
-
-- **17 entity graphics types**: point, billboard, label, polygon, polyline, box, cylinder, ellipse, ellipsoid, model, corridor, wall, rectangle, path, plane, polyline volume, tileset
-- **Particle systems**: validated scene primitives for smoke, fire, weather, and engine trails
-- **9 material types**: solid color, image, grid, stripe, checkerboard, polyline glow/arrow/dash/outline
-- **149 named colors** with `.with_alpha()` support
-- **Time-dynamic properties**: SampledPositionProperty, SampledProperty, ConstantProperty, TimeIntervalCollectionProperty, ReferenceProperty, CompositeProperty
-- **Data sources**: GeoJSON, CZML, KML, custom
-- **Imagery providers**: Bing, OSM, SingleTile, WMTS, WMS, URL template, Ion, TMS
-- **Terrain providers**: Ion world terrain, Ion asset, Cesium terrain server, ellipsoid, encoded WMS/WMTS heightmaps
-- **Camera operations**: fly_to, set_view, look_at, fly_to_entities, fly_to_bounding_sphere
-- **Entity clustering**: EntityClusterConfig groups nearby points, billboards, and labels
-- **3D Tiles styling**: Cesium3DTileStyle per-feature color, show, and point-size conditions
-- **CZML export**: to_czml_string(), save_czml(), CzmlDocument
-- **Local rasters**: `add_raster` displays GeoTIFF/COG files or xarray DataArrays as Web Mercator tiles
-- **Large point data**: `add_points` aggregates millions of points via datashader into an imagery layer
-- **Cesium Ion**: token management, 3D Tilesets, terrain
-- **Scene/Globe configuration**: fog, lighting, depth test, atmosphere, post-processing, terrain exaggeration
-- **Runtime control**: clock, live CZML/GeoJSON, selection, picking, screenshots, and Python click callbacks
-- **Event handling**: ScreenSpaceEventHandler with custom JS or Python callbacks
-- **Custom JavaScript injection**: add_script() for arbitrary JS
-- **Local HTTP server**: `show()` launches a server and opens the browser; serves a bundled offline Cesium build when present
-- **Jupyter widget**: `viewer.to_widget()` renders in a notebook with live clock control, click events, and screenshots (`[widget]` extra)
-- **Headless render testing**: `cesiumkit.testing` renders and screenshots viewers in CI without a display (playwright)
-- **Works without Ion token**: falls back to the bundled NaturalEarthII imagery (offline when vendored)
-- **Pydantic v2 models**: full validation on all inputs
-- **Type-checked**: PEP 561 `py.typed` marker ships in the wheel; the public API is pyright-clean
-
-## API overview
-
-| Module | Key classes |
-|--------|-------------|
-| `cesiumkit.Viewer` | Main entry point -- configure, add entities, show |
-| `cesiumkit.Entity` | Container for a named entity with position + graphics |
-| `cesiumkit.Cartesian3` | 3D coordinates, with `.from_degrees()` helper |
-| `cesiumkit.Color` | 149 named colors + RGBA + `.with_alpha()` |
-| `cesiumkit.*Graphics` | PointGraphics, PolygonGraphics, ModelGraphics, ... |
-| `cesiumkit.*Material` | StripeMaterial, PolylineGlowMaterial, ... |
-| `cesiumkit.*Property` | SampledPositionProperty, ConstantProperty, ... |
-| `cesiumkit.*DataSource` | GeoJsonDataSource, CzmlDataSource, KmlDataSource |
-| `cesiumkit.CzmlDocument` | Build and export CZML documents |
-| `cesiumkit.Ion` | Token management and 3D Tilesets |
-
-## Examples
-
-The [`examples/`](examples/) directory contains 11 runnable scripts:
-
-| # | File | What it shows |
-|---|------|---------------|
-| 01 | `01_basic_point.py` | Minimal point on the globe |
-| 02 | `02_shapes_and_materials.py` | Points, labels, shapes, and materials |
-| 03 | `03_multiple_cities.py` | Multiple entities on the globe |
-| 04 | `04_time_dynamic_satellite.py` | Animated satellite path with clock |
-| 05 | `05_geojson_and_datasources.py` | GeoJSON, CZML, and KML loading |
-| 06 | `06_terrain_and_imagery.py` | Terrain and imagery providers |
-| 07 | `07_3d_models_and_tilesets.py` | glTF models and 3D Tiles |
-| 08 | `08_czml_export.py` | Export entities to CZML format |
-| 09 | `09_camera_controls.py` | `fly_to`, `set_view`, and `look_at` |
-| 10 | `10_event_handlers.py` | Click events and custom JavaScript |
-| 11 | `11_runtime_control.py` | Live controls and Python click callbacks |
-
-Run any example:
-
-```bash
-python examples/01_basic_point.py
-# Opens in browser -- Ctrl+C to stop the server
-```
-
-## Cesium Ion token
-
-Many examples work without a token (using bundled offline imagery). For full functionality (Bing imagery, world terrain, 3D Tilesets), get a free token at [cesium.com/ion](https://cesium.com/ion/) and set it:
-
-```python
-cesiumkit.Ion.set_default_token("your-token-here")
-```
+Static HTML export and the Jupyter widget load from the CDN. Many features
+work without a Cesium Ion token using the bundled NaturalEarthII imagery; for
+Bing imagery, world terrain, or 3D Tilesets, get a free token at
+[cesium.com/ion](https://cesium.com/ion/) and set it with
+`cesiumkit.Ion.set_default_token("...")`.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and how to add new entity types.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and
+how to add new entity types.
 
 ## License
 
-[MIT](LICENSE)
+The code in this project is licensed under the [MIT License](LICENSE).

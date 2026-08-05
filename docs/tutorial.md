@@ -5,6 +5,10 @@ route, with a ground path, a trailing flight line, and a camera that
 follows. You should end up with a reusable pattern for any
 time-dynamic entity._
 
+!!! tip "Just want a single globe?"
+    See [How to build your first globe](getting-started.md) — the tutorial
+    assumes you have a working `Viewer` already.
+
 This tutorial builds one file, `flight_tracker.py`, step by step. Each
 section adds one piece; the final script is complete and runnable.
 
@@ -12,6 +16,10 @@ section adds one piece; the final script is complete and runnable.
 
 The flight runs between 18:00 and 19:00 UTC. Set the clock to that window
 and make it loop so the animation repeats:
+
+Think of the clock as a video player: `start_time` and `stop_time` are the
+clip's boundaries, `current_time` is the playhead, and `multiplier` is the
+playback speed.
 
 ```python
 import cesiumkit

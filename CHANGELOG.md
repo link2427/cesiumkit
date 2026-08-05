@@ -4,6 +4,38 @@ All notable changes to cesiumkit are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] - 2026-08-05
+
+### Added
+
+- **TestPyPI dry-run.** The publish workflow now has a `test-pypi` job
+  (triggered on release and manually) that publishes the same artifacts to
+  test.pypi.org and installs them back to smoke-test the vendored Cesium
+  bundle. One-time setup: add the TestPyPI trusted-publisher mapping for
+  the `testpypi` environment.
+- **PEP 740 attestation verification.** After uploading, the publish job
+  runs `gh attestation verify` on the wheel and sdist.
+- **Raster tile caching.** `RasterSource` keeps an LRU cache of rendered
+  tiles (default 512), so repeated requests skip re-rendering (~13.8 ms
+  render vs ~0 ms cache hit in the benchmark).
+- **Migration guide.** `docs/migration.md` documents everything that
+  changes between 0.x and 1.0, with before/after code for the 0.8
+  deprecations.
+- **Benchmark script.** `scripts/benchmark.py` measures `to_html()` at
+  1k/10k/50k entities (0.03s / 0.21s / 1.25s) and raster tile latency.
+  Not CI-gated.
+- **Single screenshot pipeline.** `scripts/render_examples.py` is now the
+  one entry point for both the CI render-check job and the gallery
+  workflow; the duplicate `scripts/generate_gallery.py` was removed.
+
+### Changed
+
+- The `pypi` environment is set up for a required-reviewer approval gate
+  (owner adds `link2427` in repository settings); publishes stay manual
+  until then.
+- CesiumJS currency re-verified: the bundled 1.144 is the current release
+  (2026-08-03), so no upgrade was needed.
+
 ## [0.8.0] - 2026-08-04
 
 ### Added
@@ -220,10 +252,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   explicit conversion.
 - **Optional `[gis]` install extra:** `pip install cesiumkit[gis]` pulls in
   `geopandas>=0.14` and `shapely>=2.0`.
-- **Visual gallery.** Six runnable gallery scripts in `scripts/gallery/` and
-  a playwright-based orchestrator `scripts/generate_gallery.py` that renders
-  each one to a PNG. A new `.github/workflows/gallery.yml` workflow
-  regenerates the images on release or manual trigger.
+- **Visual gallery.** Six runnable gallery scripts in `scripts/gallery/`
+  rendered to PNGs by `scripts/render_examples.py` (the same script the
+  render-check CI job uses for the examples). A `.github/workflows/gallery.yml`
+  workflow regenerates the images on release or manual trigger.
 - **Gallery page in docs** (`docs/gallery.md`) and hero image + gallery grid
   in the README.
 - **GIS tutorial page** (`docs/getting-started-gis.md`) walking through

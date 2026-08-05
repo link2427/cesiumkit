@@ -16,18 +16,32 @@ pip install "cesiumkit[datashader]" # point aggregation
 
 ## 2. Add a raster as the base layer
 
-```python
-import cesiumkit
+`add_raster` accepts a file path or a georeferenced `xarray.DataArray`, and
+sets it as the base imagery layer.
 
-viewer = cesiumkit.Viewer()
-viewer.add_raster("elevation.tif")  # any path rasterio can open
-viewer.show()
-```
+=== "From a file"
 
-`add_raster` accepts a file path or a georeferenced `xarray.DataArray` and
-sets it as the base imagery layer. Tiles are served from
-`/raster/<id>/{z}/{x}/{y}.png` in Web Mercator, matching Cesium's default
-tiling scheme.
+    ```python
+    import cesiumkit
+
+    viewer = cesiumkit.Viewer()
+    viewer.add_raster("elevation.tif")  # any path rasterio can open
+    viewer.show()
+    ```
+
+=== "From an xarray.DataArray"
+
+    ```python
+    import xarray as xr
+
+    da = xr.open_dataarray("elevation.nc")  # must be georeferenced
+    viewer = cesiumkit.Viewer()
+    viewer.add_raster(da)
+    viewer.show()
+    ```
+
+Tiles are served from `/raster/<id>/{z}/{x}/{y}.png` in Web Mercator,
+matching Cesium's default tiling scheme.
 
 ## 3. Aggregate a huge point set with datashader
 

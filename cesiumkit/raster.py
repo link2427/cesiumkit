@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import tempfile
 import threading
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
@@ -22,16 +23,25 @@ class RasterSource:
     """A raster served as Web Mercator tiles by the local viewer server.
 
     Accepts either a file path (any format rasterio can open) or an
-    ``xarray.DataArray`` with georeferencing.
+    ``xarray.DataArray`` with georeferencing. Rendered tiles are cached
+    (LRU) so repeated requests avoid re-rendering.
     """
 
-    def __init__(self, source: str | Path | Any, *, name: str | None = None) -> None:
+    def __init__(
+        self,
+        source: str | Path | Any,
+        *,
+        name: str | None = None,
+        tile_cache_size: int = 512,
+    ) -> None:
         self.id = f"raster-{generate_id()}"
         self._source = source
         self.path = str(source) if isinstance(source, (str, Path)) else None
         self.name = name or (Path(self.path).stem if self.path else "raster")
         self._reader: Any = None
         self._lock = threading.Lock()
+        self.tile_cache_size = tile_cache_size
+        self._tile_cache: OrderedDict[tuple[int, int, int], bytes] = OrderedDict()
 
     def _open_reader(self):
         from rio_tiler.io import Reader, XarrayReader
@@ -48,13 +58,35 @@ class RasterSource:
         return self._reader
 
     def tile(self, z: int, x: int, y: int) -> bytes | None:
-        """Return a PNG tile, or None when out of range."""
+        """Return a PNG tile, or None when out of range. Results are cached."""
+        key = (z, x, y)
+        with self._lock:
+            cached = self._tile_cache.get(key)
+            if cached is not None:
+                self._tile_cache.move_to_end(key)
+                return cached
         reader = self._open_reader()
         try:
             image = reader.tile(x, y, z, tilesize=_TILE_SIZE)
         except Exception:
             return None
-        return image.render(img_format="PNG")
+        body = image.render(img_format="PNG")
+        with self._lock:
+            self._tile_cache[key] = body
+            self._tile_cache.move_to_end(key)
+            while len(self._tile_cache) > self.tile_cache_size:
+                self._tile_cache.popitem(last=False)
+        return body
+
+    def clear_cache(self) -> None:
+        """Drop all cached tiles."""
+        with self._lock:
+            self._tile_cache.clear()
+
+    @property
+    def cached_tiles(self) -> int:
+        """Number of tiles currently held in the cache."""
+        return len(self._tile_cache)
 
     def close(self) -> None:
         if self._reader is not None:

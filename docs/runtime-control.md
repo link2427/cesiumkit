@@ -8,6 +8,10 @@ cesiumkit keeps a two-way bridge between Python and the browser. Python can
 update the clock and data sources, select or pick entities, capture the
 canvas, and receive click events without rebuilding the page.
 
+!!! tip "Working in a notebook instead?"
+    The Jupyter widget exposes the same control API without a server — see
+    [How to use the Jupyter widget](widget.md).
+
 ## 1. Start a controllable viewer
 
 `Viewer.show()` serves the page and blocks while the server runs. Start it

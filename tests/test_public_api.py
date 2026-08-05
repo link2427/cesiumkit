@@ -120,6 +120,8 @@ GOLDEN_TOP_LEVEL_SURFACE = {
     "CesiumTerrainProvider",
     "CheckerboardMaterial",
     "ClassificationType",
+    "ClippingPlane",
+    "ClippingPlaneCollection",
     "ClockConfig",
     "ClockRange",
     "ClockStep",

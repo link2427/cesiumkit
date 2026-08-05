@@ -143,6 +143,8 @@ from cesiumkit.properties import (
 from cesiumkit.scene import (
     AmbientOcclusionConfig,
     BloomConfig,
+    ClippingPlane,
+    ClippingPlaneCollection,
     FXAAConfig,
     PostProcessConfig,
     SceneConfig,
@@ -290,6 +292,8 @@ __all__ = [
     # Scene & Globe
     "AmbientOcclusionConfig",
     "BloomConfig",
+    "ClippingPlane",
+    "ClippingPlaneCollection",
     "FXAAConfig",
     "PostProcessConfig",
     "SceneConfig",

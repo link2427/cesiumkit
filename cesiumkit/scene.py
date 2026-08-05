@@ -8,7 +8,52 @@ from pydantic import Field
 
 from cesiumkit._js_serializer import to_js_value
 from cesiumkit.base import CesiumBase
+from cesiumkit.coordinates import Cartesian3
 from cesiumkit.enums import SceneMode
+
+
+class ClippingPlane(CesiumBase):
+    """A single clipping plane, defined by a point and a normal.
+
+    Everything on the side the normal points away from is clipped away.
+    The position and normal are ECEF :class:`Cartesian3` values; for globe
+    or tileset work you usually want a geodetic position, so build them
+    with :class:`Cartesian3FromDegrees`.
+    """
+
+    position: Cartesian3
+    normal: Cartesian3
+
+    def _js_class_name(self) -> str:
+        return "Cesium.ClippingPlane"
+
+    def to_js(self) -> str:
+        return f"new Cesium.ClippingPlane({self.position.to_js()}, {self.normal.to_js()})"
+
+
+class ClippingPlaneCollection(CesiumBase):
+    """A set of planes used to clip tilesets, models, or the globe.
+
+    ``union`` controls how the planes combine: ``False`` (default) keeps
+    the intersection of the kept regions, ``True`` keeps the union. Planes
+    are all applied regardless; the flag only changes how they combine.
+    """
+
+    planes: list[ClippingPlane] = Field(min_length=1)
+    enabled: bool = True
+    union: bool = False
+
+    def _js_class_name(self) -> str:
+        return "Cesium.ClippingPlaneCollection"
+
+    def to_js(self) -> str:
+        planes = ", ".join(plane.to_js() for plane in self.planes)
+        opts = [f"planes: [{planes}]"]
+        if not self.enabled:
+            opts.append("enabled: false")
+        if self.union:
+            opts.append("union: true")
+        return f"new Cesium.ClippingPlaneCollection({{{', '.join(opts)}}})"
 
 
 class BloomConfig(CesiumBase):
@@ -156,6 +201,8 @@ class SceneConfig(CesiumBase):
 __all__ = [
     "AmbientOcclusionConfig",
     "BloomConfig",
+    "ClippingPlane",
+    "ClippingPlaneCollection",
     "FXAAConfig",
     "PostProcessConfig",
     "SceneConfig",

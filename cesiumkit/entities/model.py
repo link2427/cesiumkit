@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from cesiumkit.entities._base import EntityGraphics
+from cesiumkit.scene import ClippingPlaneCollection
 
 
 class ModelGraphics(EntityGraphics):
@@ -24,6 +25,7 @@ class ModelGraphics(EntityGraphics):
     color_blend_mode: Any = None
     color_blend_amount: float | None = None
     distance_display_condition: Any = None
+    clipping_planes: ClippingPlaneCollection | None = None
 
     def _graphics_key(self) -> str:
         return "model"

@@ -8,6 +8,7 @@ from typing import Any
 
 from cesiumkit._js_serializer import to_js_value
 from cesiumkit.base import CesiumBase
+from cesiumkit.scene import ClippingPlaneCollection
 
 
 class Ion:
@@ -99,6 +100,7 @@ class Cesium3DTileset(CesiumBase):
     maximum_memory_usage: int | None = None
     shadows: Any = None
     style: Cesium3DTileStyle | None = None
+    clipping_planes: ClippingPlaneCollection | None = None
 
     def _js_class_name(self) -> str:
         return "Cesium.Cesium3DTileset"
@@ -114,6 +116,8 @@ class Cesium3DTileset(CesiumBase):
             opts.append(f"show: {str(self.show).lower()}")
         if "shadows" in self.model_fields_set and self.shadows is not None:
             opts.append(f"shadows: {to_js_value(self.shadows)}")
+        if self.clipping_planes is not None:
+            opts.append(f"clippingPlanes: {self.clipping_planes.to_js()}")
         return ", ".join(opts)
 
     def to_js(self) -> str:

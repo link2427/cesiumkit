@@ -89,7 +89,7 @@ class Cartesian3(CesiumBase):
         return shapely_point_to_cartesian3(geom)
 
 
-class Cartesian3FromDegrees(CesiumBase):
+class Cartesian3FromDegrees(Cartesian3):
     """A Cartesian3 created from degrees. Serializes to Cesium.Cartesian3.fromDegrees()."""
 
     longitude: float

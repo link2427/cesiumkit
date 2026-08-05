@@ -116,10 +116,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - run: pip install ".[dev,gis]" playwright
+      - run: pip install ".[dev,gis,widget,raster]" playwright
       - run: python -m playwright install chromium --with-deps
       - run: python scripts/fetch_cesium.py
       - run: mkdir -p /tmp/cesiumkit-renders && python scripts/render_examples.py --output /tmp/cesiumkit-renders
+      # The render tests need the bundled build + playwright + optional
+      # extras, so they only make sense in this job.
+      - run: pytest tests/test_widget.py tests/test_render_coverage.py tests/test_clipping.py tests/test_html_output.py tests/test_raster.py -q
       - uses: actions/upload-artifact@v4
         with:
           name: example-renders

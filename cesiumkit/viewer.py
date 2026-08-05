@@ -298,6 +298,34 @@ class Viewer:
         self._primitives.append(primitive)
         return primitive
 
+    def add_classification(
+        self,
+        positions: list[Any],
+        *,
+        color: Any = None,
+        height: float = 0.0,
+        classification_type: Any = None,
+    ) -> Any:
+        """Draw a filled polygon onto terrain or 3D Tiles.
+
+        The polygon reuses the depth of the surface it drapes over, so it
+        follows hills and buildings instead of floating. ``positions`` are
+        ECEF points (use ``Cartesian3FromDegrees``); ``classification_type``
+        is one of ``ClassificationType.TERRAIN``, ``CESIUM_3D_TILE``, or
+        ``BOTH`` (the default).
+        """
+        from cesiumkit.scene import ClassificationPrimitive
+
+        options: dict[str, Any] = {
+            "positions": list(positions),
+            "height": height,
+        }
+        if color is not None:
+            options["color"] = color
+        if classification_type is not None:
+            options["classification_type"] = classification_type
+        return self.add_primitive(ClassificationPrimitive(**options))
+
     def add_raster(self, source: Any, *, name: str | None = None) -> Any:
         """Display a local raster (GeoTIFF/COG path or xarray DataArray).
 

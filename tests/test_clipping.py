@@ -57,6 +57,61 @@ class TestClippingPlaneCollection:
             cesiumkit.ClippingPlaneCollection(planes=[])
 
 
+class TestClassificationPrimitive:
+    def _positions(self):
+        return [
+            cesiumkit.Cartesian3FromDegrees(longitude=-74.02, latitude=40.70),
+            cesiumkit.Cartesian3FromDegrees(longitude=-73.98, latitude=40.70),
+            cesiumkit.Cartesian3FromDegrees(longitude=-74.00, latitude=40.74),
+        ]
+
+    def test_to_js_defaults(self):
+        js = cesiumkit.ClassificationPrimitive(positions=self._positions()).to_js()
+        assert js.startswith("new Cesium.ClassificationPrimitive({")
+        assert "new Cesium.PolygonGeometry.fromPositions({" in js
+        assert "Cesium.Cartesian3.fromDegrees(-74.02, 40.7)" in js
+        assert "classificationType: Cesium.ClassificationType.BOTH" in js
+        assert "Cesium.ColorGeometryInstanceAttribute.fromColor(Cesium.Color.RED)" in js
+        assert "show" not in js
+
+    def test_to_js_color_and_type(self):
+        js = cesiumkit.ClassificationPrimitive(
+            positions=self._positions(),
+            color=cesiumkit.Color(red=0.2, green=0.5, blue=1.0),
+            classification_type=cesiumkit.ClassificationType.TERRAIN,
+            show=False,
+        ).to_js()
+        assert "fromColor(new Cesium.Color(0.2, 0.5, 1.0, 1.0))" in js
+        assert "classificationType: Cesium.ClassificationType.TERRAIN" in js
+        assert "show: false" in js
+
+    def test_too_few_positions_rejected(self):
+        with pytest.raises(ValidationError):
+            cesiumkit.ClassificationPrimitive(
+                positions=[
+                    cesiumkit.Cartesian3(x=0, y=0, z=0),
+                    cesiumkit.Cartesian3(x=1, y=0, z=0),
+                ]
+            )
+
+    def test_add_classification_through_viewer(self):
+        viewer = cesiumkit.Viewer()
+        primitive = viewer.add_classification(self._positions())
+        assert isinstance(primitive, cesiumkit.ClassificationPrimitive)
+        html = viewer.to_html()
+        assert "viewer.scene.primitives.add(new Cesium.ClassificationPrimitive({" in html
+
+    def test_add_classification_with_options(self):
+        viewer = cesiumkit.Viewer()
+        viewer.add_classification(
+            self._positions(),
+            color=cesiumkit.Color(red=1.0, green=0.0, blue=0.0),
+            classification_type=cesiumkit.ClassificationType.CESIUM_3D_TILE,
+        )
+        html = viewer.to_html()
+        assert "classificationType: Cesium.ClassificationType.CESIUM_3D_TILE" in html
+
+
 class TestClippingWiring:
     def test_tileset_clipping_planes(self):
         tileset = cesiumkit.Cesium3DTileset(

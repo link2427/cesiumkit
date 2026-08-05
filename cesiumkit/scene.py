@@ -9,7 +9,7 @@ from pydantic import Field
 from cesiumkit._js_serializer import to_js_value
 from cesiumkit.base import CesiumBase
 from cesiumkit.coordinates import Cartesian3
-from cesiumkit.enums import SceneMode
+from cesiumkit.enums import ClassificationType, SceneMode
 
 
 class ClippingPlane(CesiumBase):
@@ -54,6 +54,44 @@ class ClippingPlaneCollection(CesiumBase):
         if self.union:
             opts.append("union: true")
         return f"new Cesium.ClippingPlaneCollection({{{', '.join(opts)}}})"
+
+
+class ClassificationPrimitive(CesiumBase):
+    """A filled polygon drawn by classifying terrain or 3D Tiles.
+
+    Classification reuses the depth of the surface it sits on instead of
+    rendering its own geometry, so the polygon drapes perfectly over
+    hills and buildings. The polygon ring is ``positions`` (ECEF
+    :class:`Cartesian3` values, usually from :class:`Cartesian3FromDegrees`)
+    at a fixed ``height`` above the ellipsoid.
+    """
+
+    positions: list[Cartesian3] = Field(min_length=3)
+    color: Any = None
+    height: float = 0.0
+    classification_type: ClassificationType = ClassificationType.BOTH
+    show: bool = True
+
+    def _js_class_name(self) -> str:
+        return "Cesium.ClassificationPrimitive"
+
+    def to_js(self) -> str:
+        positions = ", ".join(pos.to_js() for pos in self.positions)
+        color = self.color.to_js() if self.color is not None else "Cesium.Color.RED"
+        opts = [
+            "geometryInstances: new Cesium.GeometryInstance({",
+            "    geometry: new Cesium.PolygonGeometry.fromPositions({",
+            f"        positions: [{positions}],",
+            f"        height: {self.height},",
+            "    }),",
+            f"    attributes: {{ color: Cesium.ColorGeometryInstanceAttribute.fromColor({color}) }},",
+            "})",
+            f"classificationType: Cesium.ClassificationType.{self.classification_type.value}",
+        ]
+        if not self.show:
+            opts.append("show: false")
+        inner = ",\n    ".join(opts)
+        return f"new Cesium.ClassificationPrimitive({{\n    {inner}\n}})"
 
 
 class BloomConfig(CesiumBase):
@@ -201,6 +239,7 @@ class SceneConfig(CesiumBase):
 __all__ = [
     "AmbientOcclusionConfig",
     "BloomConfig",
+    "ClassificationPrimitive",
     "ClippingPlane",
     "ClippingPlaneCollection",
     "FXAAConfig",

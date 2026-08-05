@@ -119,6 +119,7 @@ GOLDEN_TOP_LEVEL_SURFACE = {
     "CesiumEnum",
     "CesiumTerrainProvider",
     "CheckerboardMaterial",
+    "ClassificationPrimitive",
     "ClassificationType",
     "ClippingPlane",
     "ClippingPlaneCollection",

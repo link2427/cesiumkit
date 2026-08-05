@@ -7,6 +7,7 @@ on:
 
 permissions:
   id-token: write
+  contents: read
 
 jobs:
   # Dry-run: publish the same artifacts to TestPyPI, install them back from
@@ -54,7 +55,23 @@ jobs:
           /tmp/sdist-venv/bin/pip install --quiet dist/*.tar.gz
           /tmp/sdist-venv/bin/python -c "import cesiumkit; import cesiumkit._vendor as v; assert v.vendor_dir() is not None, 'vendored Cesium missing from sdist'; print('sdist OK:', cesiumkit.__version__)"
       - uses: pypa/gh-action-pypi-publish@release/v1
-      - name: Verify PEP 740 attestations
+      - name: Verify PEP 740 attestations on PyPI
         run: |
-          gh attestation verify dist/cesiumkit-*.whl --owner link2427
-          gh attestation verify dist/cesiumkit-*.tar.gz --owner link2427
+          pip install pypi-attestations
+          for f in dist/cesiumkit-*.whl dist/cesiumkit-*.tar.gz; do
+            ok=0
+            for i in $(seq 1 12); do
+              if python -m pypi_attestations verify pypi "$f" \
+                  --repository https://github.com/link2427/cesiumkit; then
+                ok=1
+                break
+              fi
+              echo "attestation not visible yet, retrying ($i/12)..."
+              sleep 10
+            done
+            if [ "$ok" -ne 1 ]; then
+              echo "FAILED to verify attestation for $f"
+              exit 1
+            fi
+          done
+          echo "all PEP 740 attestations verified"

@@ -9,8 +9,9 @@ warning) until 1.0._
 
 From 1.0 on, cesiumkit follows semantic versioning strictly: breaking
 changes only land in major releases, and any deprecation is announced at
-least one minor release before removal. APIs deprecated in 0.8 are removed
-at 1.0.
+least one minor release before removal. The APIs deprecated in 0.8 were
+removed at 1.0 — that was the last time removals happened on that short a
+schedule; see the deprecation policy in CONTRIBUTING.md for the 1.x rules.
 
 ## Removed at 1.0
 

@@ -163,7 +163,14 @@ my_type: MyTypeGraphics | None = None
 ## Deprecation policy
 
 cesiumkit follows the pandas-style schedule: **deprecate in a minor
-release, remove only at 1.0** (and in majors after that).
+release, remove in a later one**, with at least one minor of notice.
+
+### Pre-1.0 (0.x)
+
+Before 1.0 the API is still settling, so the window is shorter:
+deprecations land in a minor and removal happens at the next minor that
+announces it, or at 1.0 for items deprecated in 0.8. The 0.x era is the
+only time removals are allowed on this cadence.
 
 - To deprecate an API, emit a `DeprecationWarning` via
   `cesiumkit._deprecations` (`warn_deprecated` for constructor params and
@@ -178,6 +185,22 @@ release, remove only at 1.0** (and in majors after that).
   `-W error::DeprecationWarning`, so internal uses of deprecated APIs and
   regressions fail CI. Tests that intentionally exercise a deprecated API
   must wrap the call in `pytest.warns(DeprecationWarning)`.
+
+### From 1.0 on
+
+1.0 freezes the public API. After it:
+
+- **Breaking changes require a major version bump.** The exported surface
+  (everything in a module's `__all__`, constructor signatures, and
+  documented behavior) is a contract. Removing or changing it is a major
+  release, full stop.
+- **Deprecations are announced at least one minor before removal.** An API
+  deprecated in `1.x` is not removed before `2.0`, and `2.0` must carry
+  the removal notes from every deprecation made during 1.x.
+- The changelog keeps its `Deprecated` / `Removed` sections on every
+  release that touches either.
+- The `-W error::DeprecationWarning` CI gate stays on forever: a green
+  suite is the proof that nothing internal uses a deprecated path.
 
 ## Version support
 

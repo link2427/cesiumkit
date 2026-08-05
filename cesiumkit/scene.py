@@ -78,14 +78,17 @@ class ClassificationPrimitive(CesiumBase):
     def to_js(self) -> str:
         positions = ", ".join(pos.to_js() for pos in self.positions)
         color = self.color.to_js() if self.color is not None else "Cesium.Color.RED"
+        geometry = (
+            "new Cesium.GeometryInstance({\n"
+            f"    geometry: new Cesium.PolygonGeometry.fromPositions({{\n"
+            f"        positions: [{positions}],\n"
+            f"        height: {self.height},\n"
+            f"    }}),\n"
+            f"    attributes: {{ color: Cesium.ColorGeometryInstanceAttribute.fromColor({color}) }},\n"
+            "})"
+        )
         opts = [
-            "geometryInstances: new Cesium.GeometryInstance({",
-            "    geometry: new Cesium.PolygonGeometry.fromPositions({",
-            f"        positions: [{positions}],",
-            f"        height: {self.height},",
-            "    }),",
-            f"    attributes: {{ color: Cesium.ColorGeometryInstanceAttribute.fromColor({color}) }},",
-            "})",
+            f"geometryInstances: {geometry}",
             f"classificationType: Cesium.ClassificationType.{self.classification_type.value}",
         ]
         if not self.show:

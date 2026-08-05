@@ -112,6 +112,43 @@ class TestClassificationPrimitive:
         assert "classificationType: Cesium.ClassificationType.CESIUM_3D_TILE" in html
 
 
+class TestClippingRenders:
+    """Headless render checks: the generated JS must run, not just exist."""
+
+    def _clipped_viewer(self):
+        viewer = cesiumkit.Viewer(
+            globe=cesiumkit.GlobeConfig(
+                clipping_planes=cesiumkit.ClippingPlaneCollection(
+                    planes=[
+                        cesiumkit.ClippingPlane(
+                            position=cesiumkit.Cartesian3FromDegrees(longitude=-74.0, latitude=40.7, height=0),
+                            normal=cesiumkit.Cartesian3(x=0, y=0, z=1),
+                        )
+                    ]
+                )
+            )
+        )
+        viewer.add_classification(
+            [
+                cesiumkit.Cartesian3FromDegrees(longitude=-74.02, latitude=40.70),
+                cesiumkit.Cartesian3FromDegrees(longitude=-73.98, latitude=40.70),
+                cesiumkit.Cartesian3FromDegrees(longitude=-74.00, latitude=40.74),
+            ],
+            color=cesiumkit.Color(red=0.0, green=0.6, blue=0.9, alpha=0.6),
+        )
+        return viewer
+
+    def test_clipping_and_classification_render(self):
+        from cesiumkit import _vendor
+
+        if _vendor.vendor_dir() is None:
+            pytest.skip("bundled Cesium build not present")
+        from cesiumkit.testing import render_state
+
+        state = render_state(self._clipped_viewer(), wait_ms=6000)
+        assert not state["pageErrors"], state["pageErrors"]
+
+
 class TestClippingWiring:
     def test_tileset_clipping_planes(self):
         tileset = cesiumkit.Cesium3DTileset(

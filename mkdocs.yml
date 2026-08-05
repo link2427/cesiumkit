@@ -96,6 +96,7 @@ nav:
       - How to control a live viewer: runtime-control.md
       - How to use the Jupyter widget: widget.md
       - How to display rasters and large point data: raster.md
+      - How to clip and classify 3D Tiles: guide/clipping.md
   - Examples:
       - examples/index.md
       - examples/01_basic_point.md

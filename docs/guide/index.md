@@ -41,4 +41,13 @@ one is a numbered set of steps with a runnable example._
 
     [:octicons-arrow-right-24: How to display rasters and large point data](../raster.md)
 
+-   :material-content-cut:{ .lg .middle } **Clip and classify 3D Tiles**
+
+    ---
+
+    Cut tilesets, models, or the globe with planes, and paint polygons
+    that drape over terrain and buildings.
+
+    [:octicons-arrow-right-24: How to clip and classify 3D Tiles](clipping.md)
+
 </div>

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from cesiumkit._js_serializer import to_js_value
 from cesiumkit.base import CesiumBase
@@ -77,7 +77,19 @@ class ClassificationPrimitive(CesiumBase):
 
     def to_js(self) -> str:
         positions = ", ".join(pos.to_js() for pos in self.positions)
-        color = self.color.to_js() if self.color is not None else "Cesium.Color.RED"
+        color = self.color
+        if color is None:
+            color = "Cesium.Color.RED"
+        elif isinstance(color, str):
+            from cesiumkit.color import Color
+
+            color = Color.from_css(color).to_js()
+        elif hasattr(color, "to_js"):
+            color = color.to_js()
+        else:
+            raise TypeError(
+                f"classification color must be a Color or CSS hex string, got {type(color).__name__}"
+            )
         geometry = (
             "new Cesium.GeometryInstance({\n"
             f"    geometry: new Cesium.PolygonGeometry.fromPositions({{\n"
@@ -208,6 +220,14 @@ class SceneConfig(CesiumBase):
     atmosphere_hue_shift: float | None = Field(default=None, ge=-1, le=1, allow_inf_nan=False)
     atmosphere_saturation_shift: float | None = Field(default=None, ge=-1, le=1, allow_inf_nan=False)
     msaa_samples: int | None = Field(default=None, ge=1, le=16)
+
+    @field_validator("msaa_samples")
+    @classmethod
+    def _msaa_power_of_two(cls, value: int | None) -> int | None:
+        if value is None or value <= 0 or (value & (value - 1)) != 0:
+            raise ValueError("msaa_samples must be a power of two (1, 2, 4, 8, or 16)")
+        return value
+
     background_color: Any = None
     order_independent_translucency: bool | None = None
     request_render_mode: bool | None = None

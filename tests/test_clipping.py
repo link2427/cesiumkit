@@ -85,6 +85,23 @@ class TestClassificationPrimitive:
         assert "classificationType: Cesium.ClassificationType.TERRAIN" in js
         assert "show: false" in js
 
+    def test_to_js_css_string_color(self):
+        js = cesiumkit.ClassificationPrimitive(
+            positions=self._positions(),
+            color="#ff8800",
+        ).to_js()
+        # the hex string becomes a concrete Color, never fromColor("...")
+        assert "fromColor(new Cesium.Color(1.0, 0.5333333333333333, 0.0, 1.0))" in js
+        assert 'fromColor("' not in js
+
+    def test_non_hex_color_string_rejected(self):
+        with pytest.raises(ValueError):
+            cesiumkit.ClassificationPrimitive(positions=self._positions(), color="red").to_js()
+
+    def test_unsupported_color_type_rejected(self):
+        with pytest.raises(TypeError):
+            cesiumkit.ClassificationPrimitive(positions=self._positions(), color=(1.0, 0.0, 0.0)).to_js()
+
     def test_too_few_positions_rejected(self):
         with pytest.raises(ValidationError):
             cesiumkit.ClassificationPrimitive(

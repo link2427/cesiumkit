@@ -362,11 +362,10 @@ class Viewer:
         self._raster_sources[raster.id] = raster
         from cesiumkit.imagery import UrlTemplateImageryProvider
 
-        provider = UrlTemplateImageryProvider(url=f"/raster/{raster.id}/{{z}}/{{x}}/{{y}}.png")
+        provider_options: dict[str, Any] = {"url": f"/raster/{raster.id}/{{z}}/{{x}}/{{y}}.png"}
         if maximum_level is not None:
-            provider = UrlTemplateImageryProvider(
-                url=f"/raster/{raster.id}/{{z}}/{{x}}/{{y}}.png", maximum_level=maximum_level
-            )
+            provider_options["maximum_level"] = maximum_level
+        provider = UrlTemplateImageryProvider(**provider_options)
         if not self._raster_layers:
             self._viewer_options["base_layer"] = provider
         self._raster_layers.append({"id": raster.id, "opacity": opacity, "maximum_level": maximum_level})

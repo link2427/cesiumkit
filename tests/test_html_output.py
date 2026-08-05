@@ -222,6 +222,9 @@ class TestFullHtmlOutput:
             cesiumkit.SceneConfig(atmosphere_hue_shift=2)
         with pytest.raises(ValidationError):
             cesiumkit.SceneConfig(msaa_samples=0)
+        with pytest.raises(ValidationError):
+            # Cesium only accepts power-of-two sample counts
+            cesiumkit.SceneConfig(msaa_samples=3)
 
     def test_viewer_shadow_options(self):
         viewer = cesiumkit.Viewer(

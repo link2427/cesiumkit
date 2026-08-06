@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
+from typing import Annotated
+
+from pydantic import Field
+
 from cesiumkit.base import CesiumBase
+
+_FiniteFloat = Annotated[float, Field(allow_inf_nan=False)]
 
 
 class HeadingPitchRoll(CesiumBase):
     """Rotation defined by heading, pitch, and roll in radians."""
 
-    heading: float = 0.0
-    pitch: float = 0.0
-    roll: float = 0.0
+    heading: _FiniteFloat = 0.0
+    pitch: _FiniteFloat = 0.0
+    roll: _FiniteFloat = 0.0
 
     def _js_class_name(self) -> str:
         return "Cesium.HeadingPitchRoll"
@@ -27,9 +33,9 @@ class HeadingPitchRoll(CesiumBase):
 class HeadingPitchRollFromDegrees(CesiumBase):
     """HeadingPitchRoll from degree values."""
 
-    heading: float = 0.0
-    pitch: float = 0.0
-    roll: float = 0.0
+    heading: _FiniteFloat = 0.0
+    pitch: _FiniteFloat = 0.0
+    roll: _FiniteFloat = 0.0
 
     def _js_class_name(self) -> str:
         return "Cesium.HeadingPitchRoll"
@@ -46,9 +52,9 @@ class HeadingPitchRollFromDegrees(CesiumBase):
 class HeadingPitchRange(CesiumBase):
     """Camera offset defined by heading, pitch, and range."""
 
-    heading: float = 0.0
-    pitch: float = 0.0
-    range: float = 0.0
+    heading: _FiniteFloat = 0.0
+    pitch: _FiniteFloat = 0.0
+    range: float = Field(default=0.0, ge=0, allow_inf_nan=False)
 
     def _js_class_name(self) -> str:
         return "Cesium.HeadingPitchRange"
@@ -60,10 +66,10 @@ class HeadingPitchRange(CesiumBase):
 class Quaternion(CesiumBase):
     """A rotation represented as a quaternion."""
 
-    x: float
-    y: float
-    z: float
-    w: float
+    x: _FiniteFloat
+    y: _FiniteFloat
+    z: _FiniteFloat
+    w: _FiniteFloat
 
     def _js_class_name(self) -> str:
         return "Cesium.Quaternion"
@@ -78,7 +84,7 @@ class Quaternion(CesiumBase):
 class Matrix3(CesiumBase):
     """A 3x3 matrix stored as 9 values in column-major order."""
 
-    values: list[float]
+    values: list[_FiniteFloat] = Field(min_length=9, max_length=9)
 
     def _js_class_name(self) -> str:
         return "Cesium.Matrix3"
@@ -91,7 +97,7 @@ class Matrix3(CesiumBase):
 class Matrix4(CesiumBase):
     """A 4x4 matrix stored as 16 values in column-major order."""
 
-    values: list[float]
+    values: list[_FiniteFloat] = Field(min_length=16, max_length=16)
 
     def _js_class_name(self) -> str:
         return "Cesium.Matrix4"

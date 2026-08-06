@@ -1,5 +1,8 @@
 """Tests for cesiumkit.color module."""
 
+import pytest
+from pydantic import ValidationError
+
 import cesiumkit
 from cesiumkit.color import BLUE, RED, TRANSPARENT, WHITE, Color
 
@@ -56,3 +59,13 @@ class TestColor:
         assert c.red == 0.5
         assert 0.0 <= c.green <= 1.0
         assert 0.0 <= c.blue <= 1.0
+
+    @pytest.mark.parametrize("channel", [-0.1, 1.1, float("nan"), float("inf")])
+    def test_channels_must_be_finite_and_normalized(self, channel):
+        with pytest.raises(ValidationError):
+            Color(red=channel)
+
+    @pytest.mark.parametrize("channel", [-1, 256, True, 1.5])
+    def test_byte_channels_are_validated(self, channel):
+        with pytest.raises(ValueError):
+            Color.from_bytes(channel, 0, 0)

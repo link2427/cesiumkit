@@ -21,9 +21,7 @@ class TestEllipsoidTerrainProvider:
 class TestCesiumTerrainProvider:
     def test_to_js(self):
         p = CesiumTerrainProvider(url="https://assets.cesium.com/1")
-        js = p.to_js()
-        assert "CesiumTerrainProvider.fromUrl" in js
-        assert "https://assets.cesium.com/1" in js
+        assert p.to_js() == 'Cesium.CesiumTerrainProvider.fromUrl("https://assets.cesium.com/1")'
 
     def test_to_js_with_options(self):
         js = CesiumTerrainProvider(
@@ -31,8 +29,14 @@ class TestCesiumTerrainProvider:
             request_vertex_normals=True,
             request_water_mask=True,
         ).to_js()
+        assert js.startswith('Cesium.CesiumTerrainProvider.fromUrl("https://assets.cesium.com/1", {')
         assert "requestVertexNormals: true" in js
         assert "requestWaterMask: true" in js
+
+    def test_url_is_inline_script_safe(self):
+        js = CesiumTerrainProvider(url='https://example.com/</script><script>alert("x")</script>').to_js()
+        assert "</script>" not in js
+        assert "\\u003c/script\\u003e" in js
 
 
 class TestIonTerrainProvider:
@@ -53,6 +57,11 @@ class TestIonTerrainProvider:
         js = p.to_js()
         assert "CesiumTerrainProvider.fromIonAssetId(75343" in js
         assert "createWorldTerrainAsync" not in js
+
+    @pytest.mark.parametrize("asset_id", [0, -1, True])
+    def test_asset_id_must_be_positive_plain_int(self, asset_id):
+        with pytest.raises(ValidationError):
+            IonTerrainProvider(asset_id=asset_id)
 
 
 class TestWmsTerrainProvider:

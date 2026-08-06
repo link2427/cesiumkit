@@ -8,6 +8,7 @@ from pydantic import Field
 
 from cesiumkit._js_serializer import to_js_value
 from cesiumkit.base import CesiumBase
+from cesiumkit.scene import ClippingPlaneCollection
 
 
 class GlobeConfig(CesiumBase):
@@ -24,6 +25,7 @@ class GlobeConfig(CesiumBase):
     show_sky_atmosphere: bool | None = None
     terrain_exaggeration: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     terrain_exaggeration_relative_height: float | None = Field(default=None, allow_inf_nan=False)
+    clipping_planes: ClippingPlaneCollection | None = None
 
     def _js_class_name(self) -> str:
         return "globe"
@@ -51,6 +53,8 @@ class GlobeConfig(CesiumBase):
             stmts.append(
                 f"{viewer_var}.scene.verticalExaggerationRelativeHeight = {self.terrain_exaggeration_relative_height};"
             )
+        if self.clipping_planes is not None:
+            stmts.append(f"{viewer_var}.scene.globe.clippingPlanes = {self.clipping_planes.to_js()};")
         return stmts
 
 

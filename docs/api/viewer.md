@@ -4,6 +4,21 @@ The main entry point for building CesiumJS visualizations.
 
 ::: cesiumkit.viewer
 
+## Shadows and 3D-only mode
+
+`shadows` and `terrain_shadows` take a `ShadowMode` (`DISABLED`, `ENABLED`,
+`CAST_ONLY`, `RECEIVE_ONLY`) and control which objects cast and receive
+shadows. `scene3d_only=True` builds a scene that only ever renders in 3D
+(no 2D/Columbus morphing widgets, marginally faster startup):
+
+```python
+viewer = cesiumkit.Viewer(
+    shadows=cesiumkit.ShadowMode.ENABLED,
+    terrain_shadows=cesiumkit.ShadowMode.RECEIVE_ONLY,
+    scene3d_only=False,
+)
+```
+
 ## Runtime clock control
 
 When a viewer is being served with `show()`, Python can update and read its

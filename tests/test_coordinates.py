@@ -1,5 +1,8 @@
 """Tests for cesiumkit.coordinates module."""
 
+import pytest
+from pydantic import ValidationError
+
 from cesiumkit.coordinates import (
     BoundingSphere,
     Cartesian2,
@@ -36,7 +39,16 @@ class TestCartesian3:
 
     def test_from_radians(self):
         c = Cartesian3.from_radians(1.0, 0.5, 100.0)
+        assert isinstance(c, Cartesian3)
         assert "fromRadians" in c.to_js()
+
+    def test_non_finite_cartesian_rejected(self):
+        with pytest.raises(ValidationError):
+            Cartesian3(x=float("nan"), y=0, z=0)
+
+    def test_geographic_bounds_are_validated(self):
+        with pytest.raises(ValidationError):
+            Cartesian3.from_degrees(0, 91)
 
     def test_from_degrees_array(self):
         c = Cartesian3.from_degrees_array([-75, 40, -80, 35])
@@ -45,6 +57,12 @@ class TestCartesian3:
     def test_from_degrees_array_heights(self):
         c = Cartesian3.from_degrees_array_heights([-75, 40, 100, -80, 35, 200])
         assert "fromDegreesArrayHeights" in c.to_js()
+
+    def test_coordinate_arrays_require_complete_valid_tuples(self):
+        with pytest.raises(ValidationError):
+            Cartesian3.from_degrees_array([0, 0, 1])
+        with pytest.raises(ValidationError):
+            Cartesian3.from_degrees_array_heights([0, 91, 0])
 
     def test_czml_cartesian(self):
         c = Cartesian3(x=1.0, y=2.0, z=3.0)
@@ -72,7 +90,12 @@ class TestRectangleCoords:
 
     def test_from_degrees(self):
         r = RectangleCoords.from_degrees(-120, 30, -80, 50)
+        assert isinstance(r, RectangleCoords)
         assert "fromDegrees" in r.to_js()
+
+    def test_latitudes_must_be_ordered(self):
+        with pytest.raises(ValidationError):
+            RectangleCoords.from_degrees(-120, 50, -80, 30)
 
 
 class TestNearFarScalar:
@@ -80,6 +103,10 @@ class TestNearFarScalar:
         nfs = NearFarScalar(near=1e2, near_value=1.0, far=1e7, far_value=0.0)
         js = nfs.to_js()
         assert "NearFarScalar" in js
+
+    def test_distances_must_be_ordered(self):
+        with pytest.raises(ValidationError):
+            NearFarScalar(near=100, near_value=1, far=10, far_value=0)
 
 
 class TestDistanceDisplayCondition:

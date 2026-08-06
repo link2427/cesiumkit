@@ -2,13 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>{{ title }}</title>
-    <script src="{{ cesium_js_url }}"></script>
-    <link href="{{ cesium_css_url }}" rel="stylesheet">
+    <title>{{ title | forceescape }}</title>
+    <script src="{{ cesium_js_url | forceescape }}"></script>
+    <link href="{{ cesium_css_url | forceescape }}" rel="stylesheet">
     <style>
-        html, body, #{{ container_id }} {
-            width: {{ width }};
-            height: {{ height }};
+        html, body, .cesiumkit-container {
             margin: 0;
             padding: 0;
             overflow: hidden;
@@ -16,10 +14,10 @@
     </style>
 </head>
 <body>
-    <div id="{{ container_id }}"></div>
+    <div id="{{ container_id | forceescape }}" class="cesiumkit-container"></div>
     <script>
         {% if ion_token %}
-        Cesium.Ion.defaultAccessToken = '{{ ion_token }}';
+        Cesium.Ion.defaultAccessToken = {{ ion_token | tojs | safe }};
         {% endif %}
 
         {% if not ion_token %}
@@ -31,8 +29,8 @@
         // async path entirely -- the provider is ready the moment it's
         // constructed.
         const _naturalEarthUrl = Cesium.buildModuleUrl("Assets/Textures/NaturalEarthII/") + "{z}/{x}/{reverseY}.jpg";
-        const viewerOptions = Object.assign({}, {{ viewer_options }});
-        if (!viewerOptions.baseLayer) {
+        const viewerOptions = Object.assign({}, {{ viewer_options | safe }});
+        if (viewerOptions.baseLayer === undefined) {
             viewerOptions.baseLayer = new Cesium.ImageryLayer(
                 new Cesium.UrlTemplateImageryProvider({
                     url: _naturalEarthUrl,
@@ -45,20 +43,17 @@
         if (viewerOptions.baseLayerPicker === undefined) viewerOptions.baseLayerPicker = false;
         if (viewerOptions.geocoder === undefined) viewerOptions.geocoder = false;
         {% else %}
-        const viewerOptions = {{ viewer_options }};
+        const viewerOptions = {{ viewer_options | safe }};
         {% endif %}
 
-        const viewer = new Cesium.Viewer('{{ container_id }}', viewerOptions);
+        const container = document.getElementById({{ container_id | tojs | safe }});
+        container.style.width = {{ width | tojs | safe }};
+        container.style.height = {{ height | tojs | safe }};
+        const viewer = new Cesium.Viewer(container, viewerOptions);
         // Expose the viewer on window so external tools (playwright, devtools,
         // custom scripts) can reach it. `const` is script-scoped so we need
         // to attach it explicitly.
         window.viewer = viewer;
-
-        // Allow scripts in the InfoBox iframe to suppress sandbox warnings
-        if (viewer.infoBox) {
-            viewer.infoBox.frame.removeAttribute('sandbox');
-            viewer.infoBox.frame.src = 'about:blank';
-        }
 
         {% if terrain_statement %}
         // Terrain providers are resolved asynchronously in Cesium 1.10x+;
@@ -66,7 +61,7 @@
         // viewer options.
         (async () => {
             try {
-                viewer.scene.terrainProvider = await {{ terrain_statement }};
+                viewer.scene.terrainProvider = await {{ terrain_statement | safe }};
             } catch (error) {
                 console.error('Error loading terrain:', error);
             }
@@ -74,37 +69,41 @@
         {% endif %}
 
         {% for stmt in clustering_statements %}
-        {{ stmt }}
+        {{ stmt | safe }}
         {% endfor %}
 
         {% for stmt in scene_statements %}
-        {{ stmt }}
+        {{ stmt | safe }}
         {% endfor %}
 
         {% for stmt in globe_statements %}
-        {{ stmt }}
+        {{ stmt | safe }}
         {% endfor %}
 
         {% for stmt in clock_statements %}
-        {{ stmt }}
+        {{ stmt | safe }}
+        {% endfor %}
+
+        {% for stmt in imagery_statements %}
+        {{ stmt | safe }}
         {% endfor %}
 
         {% for entity_js in entities %}
-        viewer.entities.add({{ entity_js }});
+        viewer.entities.add({{ entity_js | safe }});
         {% endfor %}
 
         {% for ds_js in data_sources %}
-        var _ds = {{ ds_js }};
+        var _ds = {{ ds_js | safe }};
         viewer.dataSources.add(_ds);
         {% for stmt in data_source_entity_statements[loop.index0] %}
-        {{ stmt }}
+        {{ stmt | safe }}
         {% endfor %}
         {% endfor %}
 
         {% for tileset_js in tilesets %}
         (async () => {
             try {
-                const tileset = await {{ tileset_js }};
+                const tileset = await {{ tileset_js | safe }};
                 viewer.scene.primitives.add(tileset);
             } catch (error) {
                 console.error('Error loading tileset:', error);
@@ -113,36 +112,56 @@
         {% endfor %}
 
         {% for primitive_js in primitives %}
-        viewer.scene.primitives.add({{ primitive_js }});
+        viewer.scene.primitives.add({{ primitive_js | safe }});
         {% endfor %}
 
         {% for camera_op in camera_operations %}
-        {{ camera_op }}
+        {{ camera_op | safe }}
         {% endfor %}
 
         {% for event_js in event_handlers %}
-        {{ event_js }};
+        {{ event_js | safe }};
         {% endfor %}
 
         {% for custom_js in custom_scripts %}
-        {{ custom_js }}
+        {{ custom_js | safe }}
         {% endfor %}
 
-        // ── Runtime command bridge ──
+        {% if render_runtime_bridge %}
+        const __cesiumkitSessionToken = {{ session_token | tojs | safe }};
         async function __cesiumkitPostResult(requestId, result, error) {
             const response = await fetch('/__cesiumkit_result', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({requestId, result, error}),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CesiumKit-Token': __cesiumkitSessionToken,
+                },
+                body: JSON.stringify({token: __cesiumkitSessionToken, requestId, result, error}),
             });
             if (!response.ok) throw new Error('Failed to return runtime command result');
+        }
+
+        async function __cesiumkitPostScreenshot(requestId, blob) {
+            const response = await fetch('/__cesiumkit_screenshot', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'image/png',
+                    'X-CesiumKit-Token': __cesiumkitSessionToken,
+                    'X-CesiumKit-Request-Id': requestId,
+                },
+                body: blob,
+            });
+            if (!response.ok) throw new Error(`Screenshot upload failed (${response.status})`);
         }
 
         async function __cesiumkitPostEvent(event, result) {
             const response = await fetch('/__cesiumkit_result', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({event, result}),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CesiumKit-Token': __cesiumkitSessionToken,
+                },
+                body: JSON.stringify({token: __cesiumkitSessionToken, event, result}),
             });
             if (!response.ok) throw new Error('Failed to return runtime event');
         }
@@ -150,12 +169,16 @@
         let _cesiumkitCmdSeq = 0;
         async function _cesiumkitPollCommands() {
             try {
-                const resp = await fetch('/__cesiumkit_cmd?seq=' + _cesiumkitCmdSeq);
+                const query = new URLSearchParams({
+                    seq: String(_cesiumkitCmdSeq),
+                    token: __cesiumkitSessionToken,
+                });
+                const resp = await fetch('/__cesiumkit_cmd?' + query, {cache: 'no-store'});
                 if (!resp.ok) return;
                 const cmd = await resp.json();
-                if (cmd.js) {
+                if (Number.isSafeInteger(cmd.seq) && typeof cmd.js === 'string') {
                     try {
-                        eval(cmd.js);
+                        if (cmd.js) eval(cmd.js);
                     } catch (error) {
                         console.error('cesiumkit runtime command failed:', error);
                     } finally {
@@ -169,6 +192,7 @@
             }
         }
         _cesiumkitPollCommands();
+        {% endif %}
     </script>
 </body>
 </html>

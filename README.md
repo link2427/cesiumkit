@@ -28,7 +28,7 @@ that libraries like folium play for 2D maps.
 - **GeoPandas / Shapely**: drop a `GeoDataFrame` on the globe in one call
 - **Rasters & large data**: local GeoTIFFs and datashader-aggregated point sets
 - **Live control**: drive the clock, update data, and receive clicks from Python
-- **Offline-friendly**: the wheel bundles a Cesium build, so `show()` works without the CDN
+- **Offline-friendly**: published wheels bundle Cesium for local `show()` sessions
 
 ## Quickstart
 
@@ -50,8 +50,9 @@ viewer.add_entity(
 viewer.show()  # opens in your browser; Ctrl+C to stop the server
 ```
 
-Requires Python 3.10+. The published wheel bundles a Cesium build, so
-`show()` works fully offline out of the box.
+Requires Python 3.10+. Published wheels bundle Cesium, so `Viewer.show()`
+does not need to download CesiumJS. A fully offline scene must also avoid
+remote imagery, terrain, data sources, and Cesium Ion resources.
 
 ## Gallery
 
@@ -76,21 +77,24 @@ Optional features ship as install extras:
 ```bash
 pip install "cesiumkit[gis]"         # GeoPandas / Shapely integration
 pip install "cesiumkit[raster]"      # local GeoTIFF / COG / DataArray tiles
-pip install "cesiumkit[datashader]"  # aggregate millions of points
+pip install "cesiumkit[datashader]"  # point aggregation (includes GIS/raster deps)
 pip install "cesiumkit[widget]"      # Jupyter widget (anywidget)
+pip install "cesiumkit[testing]"     # headless Chromium render helpers
 ```
 
-By default the generated pages load CesiumJS from the CDN. To run fully
-offline (air-gapped machines, CI, headless servers), vendor the Cesium build
-once — the wheel published to PyPI already includes it:
+Published wheels already include the checksum-verified CesiumJS 1.144 build.
+`Viewer.show()` serves that local build and the bundled NaturalEarthII
+imagery; it can run without network access when the viewer has no remote
+resources configured. A source checkout intentionally omits the large vendor
+directory, so fetch it before testing an offline local server:
 
 ```bash
-python scripts/fetch_cesium.py   # downloads the CesiumJS 1.144 release (~120 MB)
+python scripts/fetch_cesium.py   # verifies and downloads CesiumJS 1.144 (~123 MB)
 ```
 
-Static HTML export and the Jupyter widget load from the CDN. Many features
-work without a Cesium Ion token using the bundled NaturalEarthII imagery; for
-Bing imagery, world terrain, or 3D Tilesets, get a free token at
+`to_html()`/`save()` and the Jupyter widget intentionally reference the CDN;
+placing the vendor folder next to a static export does not make it offline.
+For Bing imagery, world terrain, or 3D Tilesets, get a free token at
 [cesium.com/ion](https://cesium.com/ion/) and set it with
 `cesiumkit.Ion.set_default_token("...")`.
 
@@ -98,6 +102,8 @@ Bing imagery, world terrain, or 3D Tilesets, get a free token at
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and
 how to add new entity types.
+
+Please follow the [security policy](SECURITY.md) for vulnerability reports.
 
 ## License
 

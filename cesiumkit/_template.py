@@ -19,7 +19,7 @@ def get_template_env() -> jinja2.Environment:
     template_dir = Path(__file__).parent / "templates"
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(str(template_dir)),
-        autoescape=False,
+        autoescape=True,
         keep_trailing_newline=True,
     )
     env.filters["tojs"] = _tojs_filter

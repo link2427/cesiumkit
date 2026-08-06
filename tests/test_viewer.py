@@ -1,5 +1,6 @@
 """Tests for cesiumkit.viewer module."""
 
+import base64
 from collections import deque
 
 import pytest
@@ -46,13 +47,16 @@ class TestViewer:
         ("keyword", "value"),
         [
             ("maximum_render_time_change", -1),
+            ("maximum_render_time_change", True),
             ("resolution_scale", 0),
             ("resolution_scale", float("inf")),
+            ("resolution_scale", True),
             ("target_frame_rate", 0),
+            ("target_frame_rate", True),
         ],
     )
     def test_performance_control_validation(self, keyword, value):
-        with pytest.raises(ValueError):
+        with pytest.raises((TypeError, ValueError)):
             cesiumkit.Viewer(**{keyword: value})
 
     def test_add_entity(self):
@@ -76,11 +80,10 @@ class TestViewer:
         html = v.to_html()
         assert html.count("viewer.entities.add") == 2
 
-    def test_cesium_version(self):
-        with pytest.warns(DeprecationWarning):
-            v = cesiumkit.Viewer(cesium_version="1.115")
-        html = v.to_html()
-        assert "releases/1.115/" in html
+    def test_cesium_version_rejected(self):
+        # the escape hatch was removed in 1.0; the bundled build is pinned
+        with pytest.raises(TypeError):
+            cesiumkit.Viewer(cesium_version="1.115")
 
     def test_default_cesium_version(self):
         html = cesiumkit.Viewer().to_html()
@@ -92,7 +95,9 @@ class TestViewer:
             imagery_provider=cesiumkit.IonImageryProvider(asset_id=75343),
         )
         html = v.to_html()
-        assert "baseLayer: new Cesium.ImageryLayer(new Cesium.IonImageryProvider({" in html
+        assert "baseLayer: false" in html
+        assert "const provider = await Cesium.IonImageryProvider.fromAssetId(75343);" in html
+        assert "viewer.imageryLayers.addImageryProvider(provider, 0);" in html
         assert "imageryProvider:" not in html
 
     def test_terrain_provider_assigned_after_viewer_creation(self):
@@ -160,10 +165,9 @@ class TestViewer:
 
     def test_tileset_options_serialize_when_explicit(self):
         v = cesiumkit.Viewer()
-        v.add_tileset(ion_asset_id=75343, maximum_memory_usage=536870912, maximum_screen_space_error=4.0)
+        v.add_tileset(ion_asset_id=75343, cache_bytes=536870912, maximum_screen_space_error=4.0)
         html = v.to_html()
-        assert "maximumMemoryUsage: 536870912" in html
-        assert "maximumScreenSpaceError: 4.0" in html
+        assert "fromIonAssetId(75343, {maximumScreenSpaceError: 4.0, cacheBytes: 536870912})" in html
 
     def test_tileset_defaults_stay_implicit(self):
         v = cesiumkit.Viewer()
@@ -183,7 +187,7 @@ class TestViewer:
         )
         html = v.to_html()
         assert "tileset.style = new Cesium.Cesium3DTileStyle({" in html
-        assert "\"${Height} < 100\", color('red')" in html
+        assert '"${Height} \\u003c 100", "color(\'red\')"' in html
         assert "pointSize: 4.0" in html
 
     def test_fly_to_entities(self):
@@ -287,6 +291,15 @@ class TestViewer:
         assert "fromIso8601(\"2024-01-01T00:00:00Z'); alert('nope\")" in commands[0]["js"]
         assert "if (viewer.timeline)" in commands[1]["js"]
 
+    @pytest.mark.parametrize("value", [None, 1, True])
+    def test_set_time_rejects_non_strings(self, value):
+        with pytest.raises(TypeError, match="must be a string"):
+            cesiumkit.Viewer().set_time(value)
+
+    def test_set_time_rejects_empty_strings(self):
+        with pytest.raises(ValueError, match="must not be empty"):
+            cesiumkit.Viewer().set_time("  ")
+
     def test_runtime_clock_controls(self):
         v = cesiumkit.Viewer()
         v.animate(False)
@@ -296,14 +309,28 @@ class TestViewer:
         assert "viewer.clock.multiplier = 60;" in commands
 
     def test_multiplier_must_be_finite(self):
-        with pytest.raises(ValueError, match="finite"):
-            cesiumkit.Viewer().set_multiplier(float("nan"))
+        for value in (float("nan"), float("inf"), True, "1; alert(1)"):
+            with pytest.raises((TypeError, ValueError), match="finite"):
+                cesiumkit.Viewer().set_multiplier(value)
 
-    def test_runtime_bridge_is_rendered(self):
+    def test_runtime_boolean_and_timeout_arguments_are_strict(self):
+        with pytest.raises(TypeError, match="bool"):
+            cesiumkit.Viewer().animate("false")
+        with pytest.raises(TypeError, match="timeout"):
+            cesiumkit.Viewer().wait_for_click(timeout=True)
+
+    def test_runtime_bridge_is_only_rendered_for_local_server(self):
         html = cesiumkit.Viewer().to_html()
-        assert "/__cesiumkit_cmd" in html
-        assert "/__cesiumkit_result" in html
-        assert "__cesiumkitPostResult" in html
+        assert "/__cesiumkit_cmd" not in html
+        assert "/__cesiumkit_result" not in html
+        assert "/__cesiumkit_screenshot" not in html
+        assert "__cesiumkitPostResult" not in html
+        runtime_html = cesiumkit.Viewer()._render_html(render_runtime_bridge=True, session_token="token")
+        assert "/__cesiumkit_cmd" in runtime_html
+        assert "/__cesiumkit_result" in runtime_html
+        assert "/__cesiumkit_screenshot" in runtime_html
+        assert "__cesiumkitPostResult" in runtime_html
+        assert "__cesiumkitPostScreenshot" in runtime_html
 
     def test_wait_for_runtime_result(self):
         v = cesiumkit.Viewer()
@@ -349,6 +376,8 @@ class TestViewer:
             v.poll_czml("https://example.com/live.czml", interval=0)
         with pytest.raises(ValueError, match="positive"):
             v.stream_czml([], interval=float("inf"))
+        with pytest.raises(TypeError, match="positive"):
+            v.poll_czml("https://example.com/live.czml", interval=True)
 
     def test_stream_czml_queues_each_batch(self):
         v = cesiumkit.Viewer()
@@ -393,28 +422,27 @@ class TestViewer:
         )
         assert v.drill_pick(cesiumkit.Cartesian2(x=1, y=2)) == [local]
 
-    def test_screenshot_base64_uses_runtime_result(self, monkeypatch):
+    def test_screenshot_base64_encodes_binary_runtime_payload(self, monkeypatch):
         v = cesiumkit.Viewer()
-        monkeypatch.setattr(v, "_request_runtime_result", lambda expression, *, timeout: "cG5n")
+        monkeypatch.setattr(v, "_screenshot_bytes", lambda *, timeout: b"png")
         assert v.screenshot_base64(timeout=1) == "cG5n"
 
-    def test_screenshot_writes_decoded_png(self, tmp_path, monkeypatch):
+    def test_screenshot_writes_binary_png(self, tmp_path, monkeypatch):
         v = cesiumkit.Viewer()
-        monkeypatch.setattr(v, "screenshot_base64", lambda *, timeout: "cG5n")
+        monkeypatch.setattr(v, "_screenshot_bytes", lambda *, timeout: b"png")
         path = tmp_path / "viewer.png"
         v.screenshot(path)
         assert path.read_bytes() == b"png"
 
-    def test_screenshot_rejects_malformed_base64(self, monkeypatch):
+    def test_screenshot_requires_running_server(self):
         v = cesiumkit.Viewer()
-        monkeypatch.setattr(v, "screenshot_base64", lambda *, timeout: "not base64!")
-        with pytest.raises(RuntimeError, match="malformed"):
-            v.screenshot("unused.png")
+        with pytest.raises(RuntimeError, match="show"):
+            v.screenshot_base64(timeout=0)
 
     def test_canvas_to_image(self, monkeypatch):
         png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
         v = cesiumkit.Viewer()
-        monkeypatch.setattr(v, "screenshot_base64", lambda *, timeout: png)
+        monkeypatch.setattr(v, "_screenshot_bytes", lambda *, timeout: base64.b64decode(png))
         image = v.canvas_to_image()
         assert image.size == (1, 1)
 

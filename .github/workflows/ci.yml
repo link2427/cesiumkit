@@ -6,12 +6,15 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
       - run: pip install "ruff==0.16.1" vulture
@@ -25,35 +28,45 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install ".[dev,gis]"
       - run: pytest --cov=cesiumkit --cov-fail-under=75
 
-  # Deprecation gate: the suite must pass with DeprecationWarning as an
-  # error, so internal use of a deprecated API (or a regression) fails CI.
+  # Deprecation gate: only cesiumkit's warning category is fatal. Dependency
+  # warnings remain visible but cannot block a valid project release.
   deprecations:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
       - run: pip install ".[dev,gis]"
-      - run: pytest -W error::DeprecationWarning --cov=cesiumkit --cov-fail-under=75
+      - run: pytest -W error::cesiumkit._deprecations.CesiumkitDeprecationWarning
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - run: pip install ".[dev,gis]"
+      - run: pytest -q
 
   # Docstring drift guard: any broken ``` >>> ``` example in the package
   # fails this job. Needs every optional extra so all modules import.
   doctest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
-      - run: pip install ".[dev,gis,raster,datashader,widget]" playwright
+      - run: pip install ".[dev,gis,raster,datashader,widget,testing]"
       - run: python -m playwright install chromium --with-deps
       - run: pytest --doctest-modules cesiumkit tests -q
 
@@ -62,8 +75,8 @@ jobs:
   offline:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
       - run: pip install ".[dev]"
@@ -75,21 +88,20 @@ jobs:
   typecheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
-      - run: pip install ".[dev,gis,raster,datashader,widget]" playwright
+      - run: pip install ".[dev,gis,raster,datashader,widget,testing]"
       - run: pyright cesiumkit
 
-  # Build the wheel and verify it ships the PEP 561 marker and imports
-  # cleanly in a fresh venv (no vendor fetch needed — force-include has a
-  # committed .gitkeep placeholder).
+  # Build metadata/import sanity. The release workflow separately builds
+  # with the vendored Cesium assets and browser-smokes that exact artifact.
   wheel:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
       - run: pip install build
@@ -112,15 +124,18 @@ jobs:
   render-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
-      - run: pip install ".[dev,gis]" playwright
+      - run: pip install ".[dev,gis,widget,raster,testing]"
       - run: python -m playwright install chromium --with-deps
       - run: python scripts/fetch_cesium.py
       - run: mkdir -p /tmp/cesiumkit-renders && python scripts/render_examples.py --output /tmp/cesiumkit-renders
-      - uses: actions/upload-artifact@v4
+      # The render tests need the bundled build + playwright + optional
+      # extras, so they only make sense in this job.
+      - run: pytest tests/test_widget.py tests/test_render_coverage.py tests/test_clipping.py tests/test_html_output.py tests/test_raster.py -q
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: example-renders
           path: /tmp/cesiumkit-renders

@@ -3,36 +3,80 @@ name: Docs
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_run:
+    workflows: [Gallery]
+    types: [completed]
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
-      - run: pip install ".[dev,docs,gis]" genbadge[coverage]
-      - run: pytest --cov=cesiumkit --cov-report=xml
-      - run: genbadge coverage -i coverage.xml -o docs/coverage.svg
-
-      # Pull the latest gallery screenshots from the gallery-images branch
-      # so they're included in the built docs site. The gallery branch is
-      # populated by .github/workflows/gallery.yml (manual / on release).
-      # The explicit refspec matters: a plain `git fetch origin branch`
-      # only writes FETCH_HEAD, and on a fresh runner the
-      # origin/gallery-images tracking ref does not exist, so the checkout
-      # below would fail and the site would ship with no gallery images.
-      - name: Fetch gallery images
+      - run: pip install ".[docs,gis]"
+      - name: Fetch required gallery assets
         run: |
-          mkdir -p docs/images/gallery
-          if git fetch origin gallery-images:refs/remotes/origin/gallery-images 2>/dev/null; then
-            git checkout origin/gallery-images -- docs/images/gallery || echo "No gallery images yet"
-          else
-            echo "gallery-images branch does not exist yet — skipping"
-          fi
+          git fetch --no-tags origin +refs/heads/gallery-images:refs/remotes/origin/gallery-images
+          git checkout origin/gallery-images -- docs/images/gallery
+          required=(
+            01_globe_hero.png
+            02_shapes.png
+            03_cities.png
+            04_flight_path.png
+            05_geopandas.png
+            06_polygon_3d.png
+          )
+          for image in "${required[@]}"; do
+            test -s "docs/images/gallery/${image}"
+          done
+      - name: Build documentation strictly
+        run: mkdocs build --strict
 
+  deploy:
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - run: pip install ".[dev,docs,gis]" "genbadge[coverage]"
+      - name: Fetch required gallery assets
+        run: |
+          git fetch --no-tags origin +refs/heads/gallery-images:refs/remotes/origin/gallery-images
+          git checkout origin/gallery-images -- docs/images/gallery
+          required=(
+            01_globe_hero.png
+            02_shapes.png
+            03_cities.png
+            04_flight_path.png
+            05_geopandas.png
+            06_polygon_3d.png
+          )
+          for image in "${required[@]}"; do
+            test -s "docs/images/gallery/${image}"
+          done
+      - name: Generate coverage badge
+        run: |
+          pytest --cov=cesiumkit --cov-report=xml
+          genbadge coverage -i coverage.xml -o docs/coverage.svg
       - run: mkdocs gh-deploy --force

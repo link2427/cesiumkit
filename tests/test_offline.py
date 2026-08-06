@@ -43,10 +43,7 @@ class OfflineServer:
         return self
 
     def __exit__(self, *exc) -> None:
-        server = self.viewer._server
-        if server is not None:
-            server.shutdown()
-            server.server_close()
+        self.viewer.close()
 
     def get(self, path: str) -> tuple[int, bytes]:
         with urllib.request.urlopen(f"http://127.0.0.1:{self.port}{path}", timeout=10) as response:

@@ -6,10 +6,11 @@ is: the symptom, the likely cause, and the fix._
 ## The globe renders black and no tiles appear
 
 - **No imagery layer attached.** Check that the page actually reached the
-  globe: `viewer.imageryLayers.length` in the browser console. With no Ion
-  token, cesiumkit falls back to the bundled NaturalEarthII imagery. If you
-  passed `imagery_provider`, make sure the provider URL is reachable from
-  the browser (see CORS below).
+  globe: `viewer.imageryLayers.length` in the browser console. In
+  `Viewer.show()`, an installed wheel uses bundled NaturalEarthII imagery
+  when no Ion token or imagery provider is configured. If you passed
+  `imagery_provider`, make sure its URL is reachable from the browser (see
+  CORS below).
 - **CORS blocks the tiles.** Remote imagery servers must send
   `Access-Control-Allow-Origin` headers, or the browser silently drops
   tiles. Test the tile URL directly in the browser; if it loads there but
@@ -18,20 +19,21 @@ is: the symptom, the likely cause, and the fix._
 ## Tiles load in my browser but not on a headless server or CI
 
 - **The network is blocked or rate-limited.** Tile servers (notably
-  OpenStreetMap) block cloud CI IP ranges. Use the bundled offline imagery
-  (no `imagery_provider`) or point `imagery_provider` at a server you
-  control. See the OSM policy at <https://osm.wiki/Blocked>.
+  OpenStreetMap) block cloud CI IP ranges. For an installed wheel using
+  `show()`, omit `imagery_provider` to use bundled NaturalEarthII imagery,
+  or point `imagery_provider` at a server you control. See the OSM policy at
+  <https://osm.wiki/Blocked>.
 
 ## How does offline mode decide between CDN and bundled Cesium?
 
-- `show()` serves the bundled Cesium build (shipped in the wheel since
-  0.4.0) whenever it is present, so local pages work fully offline,
-  including the NaturalEarthII fallback imagery.
+- `show()` serves the bundled Cesium build whenever it is present. Published
+  wheels include it; source checkouts need `python scripts/fetch_cesium.py`.
+  The local server also serves NaturalEarthII imagery, so this path works
+  without network access unless the viewer config requests remote resources.
 - Static HTML export (`to_html()`) and the Jupyter widget always load
-  CesiumJS from the CDN, because they have no local server. To force an
-  offline static page, vendor the build with
-  `python scripts/fetch_cesium.py` and host the `cesiumkit/vendor` folder
-  next to the HTML.
+  CesiumJS from the CDN, because they have no local server. Vendoring the
+  package folder next to a static page does not change those URLs; an offline
+  standalone export is not currently supported.
 
 ## The Jupyter widget renders nothing
 

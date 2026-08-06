@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cesiumkit"
-version = "0.9.0"
+version = "1.0.0"
 description = "Object-oriented Python interface for CesiumJS 3D geospatial visualization"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -27,7 +27,7 @@ keywords = [
     "tiles",
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "Programming Language :: Python :: 3",
@@ -68,8 +68,15 @@ raster = [
 ]
 datashader = [
     "datashader>=0.16",
+    "geopandas>=0.14",
+    "pillow>=10",
+    "rio-tiler>=4.0",
+    "rasterio>=1.3",
+    "shapely>=2.0",
+    "xarray>=2023.1",
 ]
 images = ["pillow>=10"]
+testing = ["playwright>=1.40"]
 widget = [
     "anywidget>=0.9",
     "ipywidgets>=8.0",
@@ -92,7 +99,17 @@ exclude = ["cesiumkit/vendor/.gitkeep"]
 force-include = { "cesiumkit/vendor" = "cesiumkit/vendor" }
 
 [tool.hatch.build.targets.sdist]
-exclude = ["cesiumkit/vendor/.gitkeep"]
+exclude = [
+    "cesiumkit/vendor/.gitkeep",
+    # local-only research and session files that must never ship
+    "research-to-1.0",
+    "roadmap-p2-p3.md",
+    ".reasonix",
+    ".coverage",
+    ".coverage.*",
+    "coverage.xml",
+    "htmlcov",
+]
 force-include = { "cesiumkit/vendor" = "cesiumkit/vendor" }
 
 [tool.pytest.ini_options]

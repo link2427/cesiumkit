@@ -2,13 +2,137 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
-from pydantic import Field
+from pydantic import Field, field_validator, model_validator
 
 from cesiumkit._js_serializer import to_js_value
 from cesiumkit.base import CesiumBase
-from cesiumkit.enums import SceneMode
+from cesiumkit.coordinates import Cartesian3
+from cesiumkit.enums import ClassificationType, SceneMode
+
+
+class ClippingPlane(CesiumBase):
+    """A clipping plane in Hessian normal form.
+
+    ``normal`` must be a normalized Cartesian vector. ``distance`` is the
+    signed shortest distance from the coordinate-system origin to the plane.
+    The coordinate system is determined by the object that owns the clipping
+    plane collection.
+    """
+
+    normal: Cartesian3
+    distance: float = Field(allow_inf_nan=False)
+
+    @field_validator("normal")
+    @classmethod
+    def _normal_must_be_unit_cartesian(cls, value: Cartesian3) -> Cartesian3:
+        if type(value) is not Cartesian3:
+            raise ValueError("normal must be a Cartesian3 vector, not a geographic position")
+        magnitude = math.sqrt(value.x * value.x + value.y * value.y + value.z * value.z)
+        if not math.isclose(magnitude, 1.0, rel_tol=1e-9, abs_tol=1e-12):
+            raise ValueError("normal must be normalized to unit length")
+        return value
+
+    @classmethod
+    def from_point_normal(cls, point: Cartesian3, normal: Cartesian3) -> ClippingPlane:
+        """Create a plane through an ECEF or local Cartesian point."""
+        if type(point) is not Cartesian3:
+            raise ValueError("point must contain concrete Cartesian coordinates")
+        distance = -(normal.x * point.x + normal.y * point.y + normal.z * point.z)
+        return cls(normal=normal, distance=distance)
+
+    def _js_class_name(self) -> str:
+        return "Cesium.ClippingPlane"
+
+    def to_js(self) -> str:
+        return f"new Cesium.ClippingPlane({self.normal.to_js()}, {self.distance})"
+
+
+class ClippingPlaneCollection(CesiumBase):
+    """A set of planes used to clip tilesets, models, or the globe.
+
+    With ``union_clipping_regions=False`` (the default), a region is clipped
+    only when it is outside every plane. With it enabled, a region is clipped
+    when it is outside any plane.
+    """
+
+    planes: list[ClippingPlane] = Field(min_length=1)
+    enabled: bool = True
+    union_clipping_regions: bool = False
+
+    def _js_class_name(self) -> str:
+        return "Cesium.ClippingPlaneCollection"
+
+    def to_js(self) -> str:
+        planes = ", ".join(plane.to_js() for plane in self.planes)
+        opts = [f"planes: [{planes}]"]
+        if not self.enabled:
+            opts.append("enabled: false")
+        if self.union_clipping_regions:
+            opts.append("unionClippingRegions: true")
+        return f"new Cesium.ClippingPlaneCollection({{{', '.join(opts)}}})"
+
+
+class ClassificationPrimitive(CesiumBase):
+    """A filled polygon drawn by classifying terrain or 3D Tiles.
+
+    Classification reuses the depth of the surface it sits on instead of
+    rendering its own geometry, so the polygon drapes perfectly over
+    hills and buildings. The polygon ring is ``positions`` (ECEF
+    :class:`Cartesian3` values, usually from :class:`Cartesian3FromDegrees`)
+    between ``height`` and ``extruded_height`` above the ellipsoid. Cesium
+    requires surface-following classification geometry to be a closed volume.
+    """
+
+    positions: list[Cartesian3] = Field(min_length=3)
+    color: Any = None
+    height: float = Field(default=0.0, allow_inf_nan=False)
+    extruded_height: float = Field(default=100_000.0, allow_inf_nan=False)
+    classification_type: ClassificationType = ClassificationType.BOTH
+    show: bool = True
+
+    @model_validator(mode="after")
+    def _require_non_degenerate_volume(self) -> ClassificationPrimitive:
+        if self.height == self.extruded_height:
+            raise ValueError("height and extruded_height must differ")
+        return self
+
+    def _js_class_name(self) -> str:
+        return "Cesium.ClassificationPrimitive"
+
+    def to_js(self) -> str:
+        positions = ", ".join(pos.to_js() for pos in self.positions)
+        color = self.color
+        if color is None:
+            color = "Cesium.Color.RED"
+        elif isinstance(color, str):
+            from cesiumkit.color import Color
+
+            color = Color.from_css(color).to_js()
+        elif hasattr(color, "to_js"):
+            color = color.to_js()
+        else:
+            raise TypeError(f"classification color must be a Color or CSS hex string, got {type(color).__name__}")
+        geometry = (
+            "new Cesium.GeometryInstance({\n"
+            f"    geometry: Cesium.PolygonGeometry.fromPositions({{\n"
+            f"        positions: [{positions}],\n"
+            f"        height: {self.height},\n"
+            f"        extrudedHeight: {self.extruded_height},\n"
+            f"    }}),\n"
+            f"    attributes: {{ color: Cesium.ColorGeometryInstanceAttribute.fromColor({color}) }},\n"
+            "})"
+        )
+        opts = [
+            f"geometryInstances: {geometry}",
+            f"classificationType: Cesium.ClassificationType.{self.classification_type.value}",
+        ]
+        if not self.show:
+            opts.append("show: false")
+        inner = ",\n    ".join(opts)
+        return f"new Cesium.ClassificationPrimitive({{\n    {inner}\n}})"
 
 
 class BloomConfig(CesiumBase):
@@ -115,6 +239,21 @@ class SceneConfig(CesiumBase):
     sun: bool | None = None
     moon: bool | None = None
     fog_enabled: bool | None = None
+    fog_density: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    fog_minimum_brightness: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
+    fog_screen_space_error_factor: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    atmosphere_brightness_shift: float | None = Field(default=None, ge=-1, le=1, allow_inf_nan=False)
+    atmosphere_hue_shift: float | None = Field(default=None, ge=-1, le=1, allow_inf_nan=False)
+    atmosphere_saturation_shift: float | None = Field(default=None, ge=-1, le=1, allow_inf_nan=False)
+    msaa_samples: int | None = Field(default=None, ge=1, le=16)
+
+    @field_validator("msaa_samples")
+    @classmethod
+    def _msaa_power_of_two(cls, value: int | None) -> int | None:
+        if value is None or value <= 0 or (value & (value - 1)) != 0:
+            raise ValueError("msaa_samples must be a power of two (1, 2, 4, 8, or 16)")
+        return value
+
     background_color: Any = None
     order_independent_translucency: bool | None = None
     request_render_mode: bool | None = None
@@ -139,6 +278,20 @@ class SceneConfig(CesiumBase):
             statements.append(f"{viewer_var}.scene.moon.show = {str(self.moon).lower()};")
         if self.fog_enabled is not None:
             statements.append(f"{viewer_var}.scene.fog.enabled = {str(self.fog_enabled).lower()};")
+        if self.fog_density is not None:
+            statements.append(f"{viewer_var}.scene.fog.density = {self.fog_density};")
+        if self.fog_minimum_brightness is not None:
+            statements.append(f"{viewer_var}.scene.fog.minimumBrightness = {self.fog_minimum_brightness};")
+        if self.fog_screen_space_error_factor is not None:
+            statements.append(f"{viewer_var}.scene.fog.screenSpaceErrorFactor = {self.fog_screen_space_error_factor};")
+        if self.atmosphere_brightness_shift is not None:
+            statements.append(f"{viewer_var}.scene.skyAtmosphere.brightnessShift = {self.atmosphere_brightness_shift};")
+        if self.atmosphere_hue_shift is not None:
+            statements.append(f"{viewer_var}.scene.skyAtmosphere.hueShift = {self.atmosphere_hue_shift};")
+        if self.atmosphere_saturation_shift is not None:
+            statements.append(f"{viewer_var}.scene.skyAtmosphere.saturationShift = {self.atmosphere_saturation_shift};")
+        if self.msaa_samples is not None:
+            statements.append(f"{viewer_var}.scene.msaaSamples = {self.msaa_samples};")
         if self.background_color is not None:
             statements.append(f"{viewer_var}.scene.backgroundColor = {to_js_value(self.background_color)};")
         if self.order_independent_translucency is not None:
@@ -156,6 +309,9 @@ class SceneConfig(CesiumBase):
 __all__ = [
     "AmbientOcclusionConfig",
     "BloomConfig",
+    "ClassificationPrimitive",
+    "ClippingPlane",
+    "ClippingPlaneCollection",
     "FXAAConfig",
     "PostProcessConfig",
     "SceneConfig",

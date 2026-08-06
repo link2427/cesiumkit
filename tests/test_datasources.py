@@ -26,6 +26,22 @@ class TestCzmlDataSource:
         assert "CzmlDataSource.load" in js
         assert "document" in js
 
+    def test_source_uri_name_and_visibility_are_applied(self):
+        js = CzmlDataSource(
+            data=[{"id": "document", "version": "1.0"}],
+            source_uri="https://example.com/base/",
+            name="Tracked feed",
+            show=False,
+        ).to_js()
+        assert "sourceUri" in js
+        assert 'dataSource.name = "Tracked feed"' in js
+        assert "dataSource.show = false" in js
+
+    @pytest.mark.parametrize("kwargs", [{}, {"url": "a.czml", "data": []}, {"url": ""}])
+    def test_requires_exactly_one_valid_source(self, kwargs):
+        with pytest.raises(ValidationError):
+            CzmlDataSource(**kwargs)
+
 
 class TestGeoJsonDataSource:
     def test_from_url(self):
@@ -45,6 +61,22 @@ class TestGeoJsonDataSource:
         assert "clampToGround: true" in js
         assert "strokeWidth: 3" in js
 
+    def test_source_uri_and_common_options_are_applied(self):
+        js = GeoJsonDataSource(
+            data={"type": "FeatureCollection", "features": []},
+            source_uri="https://example.com/base/",
+            name="Boundaries",
+            show=False,
+        ).to_js()
+        assert "sourceUri" in js
+        assert 'dataSource.name = "Boundaries"' in js
+        assert "dataSource.show = false" in js
+
+    @pytest.mark.parametrize("kwargs", [{}, {"url": "a.geojson", "data": {}}, {"url": ""}])
+    def test_requires_exactly_one_valid_source(self, kwargs):
+        with pytest.raises(ValidationError):
+            GeoJsonDataSource(**kwargs)
+
 
 class TestKmlDataSource:
     def test_from_url(self):
@@ -56,6 +88,11 @@ class TestKmlDataSource:
     def test_url_required(self):
         with pytest.raises(ValidationError):
             KmlDataSource()
+
+    def test_empty_url_is_rejected_and_source_uri_is_forwarded(self):
+        with pytest.raises(ValidationError):
+            KmlDataSource(url="")
+        assert "sourceUri" in KmlDataSource(url="doc.kml", source_uri="https://example.com/base/").to_js()
 
 
 class TestCustomDataSource:
@@ -69,3 +106,6 @@ class TestCustomDataSource:
         ds = CustomDataSource()
         js = ds.to_js()
         assert "CustomDataSource()" in js
+
+    def test_hidden_data_source_is_hidden(self):
+        assert "dataSource.show = false" in CustomDataSource(show=False).to_js()

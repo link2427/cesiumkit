@@ -3,58 +3,291 @@ name: Publish to PyPI
 on:
   release:
     types: [published]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Immutable release tag to publish (for example, v1.0.0)
+        required: true
+        type: string
 
 permissions:
-  id-token: write
   contents: read
 
+concurrency:
+  group: publish-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
+  cancel-in-progress: false
+
 jobs:
-  # Dry-run: publish the same artifacts to TestPyPI, install them back from
-  # TestPyPI, and smoke-test. Mirrors the real publish exactly.
+  build:
+    name: Build and smoke-test release artifacts
+    runs-on: ubuntu-latest
+    outputs:
+      release_commit: ${{ steps.release_identity.outputs.release_commit }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Verify immutable release identity
+        id: release_identity
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
+        run: |
+          tag="$RELEASE_TAG"
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must be exactly vX.Y.Z, got: $tag" >&2
+            exit 1
+          fi
+          git show-ref --verify --quiet "refs/tags/$tag"
+          if [[ "$(git cat-file -t "refs/tags/$tag")" != "tag" ]]; then
+            echo "Release tag must be annotated: $tag" >&2
+            exit 1
+          fi
+          tag_commit="$(git rev-parse "refs/tags/$tag^{commit}")"
+          test "$(git rev-parse HEAD)" = "$tag_commit"
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$tag_commit" origin/main; then
+            echo "Release tag must point to a commit reachable from main: $tag" >&2
+            exit 1
+          fi
+          version="$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")"
+          runtime_version="$(python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          module = ast.parse(Path("cesiumkit/_version.py").read_text(encoding="utf-8"))
+          for statement in module.body:
+              if isinstance(statement, ast.Assign) and any(
+                  isinstance(target, ast.Name) and target.id == "__version__" for target in statement.targets
+              ):
+                  print(ast.literal_eval(statement.value))
+                  break
+          else:
+              raise SystemExit("cesiumkit/_version.py does not assign __version__")
+          PY
+          )"
+          test "$tag" = "v$version"
+          test "$version" = "$runtime_version"
+          echo "release_commit=$tag_commit" >> "$GITHUB_OUTPUT"
+          echo "Verified $tag at immutable commit $tag_commit for cesiumkit $version"
+      - run: pip install build twine
+      - name: Vendor the checksum-verified Cesium release
+        run: python scripts/fetch_cesium.py
+      - name: Build release artifacts exactly once
+        run: |
+          python -m build
+          twine check dist/*
+          (cd dist && sha256sum *.whl *.tar.gz > SHA256SUMS)
+      - name: Inspect wheel contents
+        run: |
+          python - <<'PY'
+          import glob
+          import zipfile
+
+          wheel = glob.glob("dist/*.whl")[0]
+          names = zipfile.ZipFile(wheel).namelist()
+          assert "cesiumkit/py.typed" in names, "py.typed missing from wheel"
+          assert any(name.endswith("vendor/cesium/Cesium.js") for name in names), "vendored Cesium missing from wheel"
+          print("wheel contains py.typed and vendored Cesium:", wheel)
+          PY
+      - name: Smoke-test the built wheel in a clean browser environment
+        run: |
+          python -m venv /tmp/cesiumkit-wheel-smoke
+          /tmp/cesiumkit-wheel-smoke/bin/pip install --quiet --upgrade pip
+          wheel=$(echo dist/*.whl)
+          /tmp/cesiumkit-wheel-smoke/bin/pip install --quiet "$wheel[testing]"
+          /tmp/cesiumkit-wheel-smoke/bin/python -m playwright install chromium --with-deps
+          cp scripts/smoke_render.py /tmp/cesiumkit-wheel-smoke.py
+          cd /tmp
+          /tmp/cesiumkit-wheel-smoke/bin/python cesiumkit-wheel-smoke.py --screenshot /tmp/cesiumkit-wheel-smoke.png
+          test -s /tmp/cesiumkit-wheel-smoke.png
+      - name: Smoke-test the built sdist in a fresh environment
+        run: |
+          python -m venv /tmp/cesiumkit-sdist-smoke
+          /tmp/cesiumkit-sdist-smoke/bin/pip install --quiet --upgrade pip
+          /tmp/cesiumkit-sdist-smoke/bin/pip install --quiet dist/*.tar.gz
+          cd /tmp
+          /tmp/cesiumkit-sdist-smoke/bin/python -c "import cesiumkit; import cesiumkit._vendor as v; assert v.vendor_dir() is not None; print('sdist install OK:', cesiumkit.__version__)"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-artifacts
+          path: dist
+          if-no-files-found: error
+          retention-days: 14
+
   test-pypi:
+    name: Stage and test the built artifacts on TestPyPI
+    needs: build
     runs-on: ubuntu-latest
     environment: testpypi
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.build.outputs.release_commit }}
+          persist-credentials: false
+      - name: Verify release checkout
+        env:
+          RELEASE_COMMIT: ${{ needs.build.outputs.release_commit }}
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
-      - run: pip install build twine
-      - run: python scripts/fetch_cesium.py
-      - run: python -m build
-      - run: twine check dist/*
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-artifacts
+          path: dist
+      - name: Verify staged artifact checksums
+        run: |
+          (cd dist && sha256sum -c SHA256SUMS)
+          rm dist/SHA256SUMS
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
           repository-url: https://test.pypi.org/legacy/
-      - name: Install from TestPyPI and smoke-test
+          packages-dir: dist/
+          skip-existing: true
+      - name: Verify TestPyPI has the exact staged files
         run: |
-          VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
-          python3 -m venv /tmp/tp-venv
-          /tmp/tp-venv/bin/pip install --quiet \
+          python - <<'PY'
+          import glob
+          import hashlib
+          import json
+          import time
+          import tomllib
+          import urllib.request
+
+          with open("pyproject.toml", "rb") as file:
+              version = tomllib.load(file)["project"]["version"]
+          staged = {}
+          for filename in glob.glob("dist/*"):
+              with open(filename, "rb") as file:
+                  staged[file.name] = hashlib.file_digest(file, "sha256").hexdigest()
+          for attempt in range(12):
+              try:
+                  with urllib.request.urlopen(f"https://test.pypi.org/pypi/cesiumkit/{version}/json") as response:
+                      payload = json.load(response)
+                  published = {entry["filename"]: entry["digests"]["sha256"] for entry in payload["urls"]}
+              except (OSError, json.JSONDecodeError):
+                  published = {}
+              missing = set(staged) - set(published)
+              unexpected = set(published) - set(staged)
+              mismatches = {
+                  name: digest for name, digest in staged.items() if name in published and published[name] != digest
+              }
+              if mismatches:
+                  raise SystemExit(f"TestPyPI digest mismatch: {mismatches}")
+              if unexpected:
+                  raise SystemExit(f"TestPyPI has unexpected files for this version: {sorted(unexpected)}")
+              if not missing:
+                  print("TestPyPI files match the staged release artifacts")
+                  break
+              if attempt == 11:
+                  raise SystemExit(f"TestPyPI did not expose staged files in time: {sorted(missing)}")
+              time.sleep(10)
+          PY
+      - name: Install TestPyPI wheel and browser-smoke it
+        run: |
+          VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          python -m venv /tmp/cesiumkit-testpypi-smoke
+          /tmp/cesiumkit-testpypi-smoke/bin/pip install --quiet --upgrade pip
+          mkdir -p /tmp/cesiumkit-testpypi-wheel
+          /tmp/cesiumkit-testpypi-smoke/bin/pip download --quiet --no-deps --only-binary=:all: \
             --index-url https://test.pypi.org/simple/ \
-            --extra-index-url https://pypi.org/simple/ \
+            --dest /tmp/cesiumkit-testpypi-wheel \
             "cesiumkit==${VERSION}"
-          /tmp/tp-venv/bin/python -c "import cesiumkit; import cesiumkit._vendor as v; assert v.vendor_dir() is not None, 'vendored Cesium missing from TestPyPI wheel'; print('TestPyPI install OK:', cesiumkit.__version__)"
+          wheel=$(echo /tmp/cesiumkit-testpypi-wheel/*.whl)
+          test -f "$wheel"
+          test "$(sha256sum "$wheel" | cut -d' ' -f1)" = "$(sha256sum dist/*.whl | cut -d' ' -f1)"
+          /tmp/cesiumkit-testpypi-smoke/bin/pip install --quiet \
+            --index-url https://pypi.org/simple/ \
+            "$wheel[testing]"
+          /tmp/cesiumkit-testpypi-smoke/bin/python -m playwright install chromium --with-deps
+          cp scripts/smoke_render.py /tmp/cesiumkit-testpypi-smoke.py
+          cd /tmp
+          /tmp/cesiumkit-testpypi-smoke/bin/python cesiumkit-testpypi-smoke.py --screenshot /tmp/cesiumkit-testpypi-smoke.png
+          test -s /tmp/cesiumkit-testpypi-smoke.png
 
   publish:
+    name: Promote the staged artifacts to PyPI
+    needs: [build, test-pypi]
     runs-on: ubuntu-latest
     environment: pypi
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.build.outputs.release_commit }}
+          persist-credentials: false
+      - name: Verify release checkout
+        env:
+          RELEASE_COMMIT: ${{ needs.build.outputs.release_commit }}
+        run: test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
-      - run: pip install build twine
-      - run: python scripts/fetch_cesium.py
-      - run: python -m build
-      - run: twine check dist/*
-      - name: Smoke-test the sdist in a fresh venv
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-artifacts
+          path: dist
+      - name: Verify staged artifact checksums
         run: |
-          python -m venv /tmp/sdist-venv
-          /tmp/sdist-venv/bin/pip install --quiet dist/*.tar.gz
-          /tmp/sdist-venv/bin/python -c "import cesiumkit; import cesiumkit._vendor as v; assert v.vendor_dir() is not None, 'vendored Cesium missing from sdist'; print('sdist OK:', cesiumkit.__version__)"
-      - uses: pypa/gh-action-pypi-publish@release/v1
+          (cd dist && sha256sum -c SHA256SUMS)
+          rm dist/SHA256SUMS
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          packages-dir: dist/
+          skip-existing: true
+      - name: Verify PyPI has the exact staged files
+        run: |
+          python - <<'PY'
+          import glob
+          import hashlib
+          import json
+          import time
+          import tomllib
+          import urllib.request
+
+          with open("pyproject.toml", "rb") as file:
+              version = tomllib.load(file)["project"]["version"]
+          staged = {}
+          for filename in glob.glob("dist/*"):
+              with open(filename, "rb") as file:
+                  staged[file.name] = hashlib.file_digest(file, "sha256").hexdigest()
+          for attempt in range(12):
+              try:
+                  with urllib.request.urlopen(f"https://pypi.org/pypi/cesiumkit/{version}/json") as response:
+                      payload = json.load(response)
+                  published = {entry["filename"]: entry["digests"]["sha256"] for entry in payload["urls"]}
+                  if set(published) - set(staged):
+                      raise SystemExit(
+                          f"PyPI has unexpected files for this version: {sorted(set(published) - set(staged))}"
+                      )
+                  mismatches = {
+                      name: digest
+                      for name, digest in staged.items()
+                      if name in published and published[name] != digest
+                  }
+                  if mismatches:
+                      raise SystemExit(f"PyPI digest mismatch: {mismatches}")
+                  if set(published) == set(staged) and all(
+                      published.get(name) == digest for name, digest in staged.items()
+                  ):
+                      print("PyPI files match the staged release artifacts")
+                      break
+              except OSError:
+                  pass
+              if attempt == 11:
+                  raise SystemExit("PyPI did not expose the staged artifact digests in time")
+              time.sleep(10)
+          PY
       - name: Verify PEP 740 attestations on PyPI
         run: |
           pip install pypi-attestations

@@ -1,6 +1,9 @@
 """Tests for cesiumkit.camera module."""
 
-from cesiumkit.camera import Camera
+import pytest
+from pydantic import ValidationError
+
+from cesiumkit.camera import Camera, FlyToOptions
 from cesiumkit.coordinates import Cartesian3
 from cesiumkit.math import HeadingPitchRange
 
@@ -57,3 +60,17 @@ class TestCamera:
         assert len(ops) == 2
         assert "setView" in ops[0]
         assert "flyTo" in ops[1]
+
+    @pytest.mark.parametrize("amount", [True, "1); alert(1)", -1, float("nan"), float("inf")])
+    def test_zoom_rejects_invalid_amounts(self, amount):
+        with pytest.raises((TypeError, ValueError)):
+            Camera().zoom_in(amount)
+
+    @pytest.mark.parametrize("duration", [True, "3", -1, float("nan"), float("inf")])
+    def test_flight_rejects_invalid_durations(self, duration):
+        with pytest.raises((TypeError, ValueError)):
+            Camera().fly_to(Cartesian3.from_degrees(-75, 40, 15000), duration=duration)
+
+    def test_fly_to_options_requires_raw_js_for_easing_function(self):
+        with pytest.raises(ValidationError):
+            FlyToOptions(destination=Cartesian3(x=0, y=0, z=0), easing_function="Cesium.EasingFunction.LINEAR_NONE")

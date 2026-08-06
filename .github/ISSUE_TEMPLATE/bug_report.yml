@@ -1,0 +1,44 @@
+name: Bug report
+description: Report a reproducible problem in cesiumkit.
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not report security vulnerabilities here. Use the repository Security tab instead.
+  - type: input
+    id: version
+    attributes:
+      label: cesiumkit version
+      description: Include the output of `python -c "import cesiumkit; print(cesiumkit.__version__)"`.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Python and platform
+      placeholder: Python 3.13.0 on Windows 11
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide a small, runnable Python example and any required data or URLs.
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the full traceback, browser console errors, or a screenshot when relevant.
+    validations:
+      required: true

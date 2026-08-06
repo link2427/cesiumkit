@@ -1,6 +1,17 @@
 """Tests for cesiumkit.base module."""
 
+import pytest
+from pydantic import ValidationError
+
 from cesiumkit._js_serializer import camelize, to_js_options, to_js_value
+from cesiumkit.coordinates import RectangleCoords
+
+
+def test_public_field_assignment_is_validated_atomically() -> None:
+    rectangle = RectangleCoords(west=-2.0, south=0.5, east=-1.0, north=1.0)
+    with pytest.raises(ValidationError, match="south must be less than or equal to north"):
+        rectangle.south = 1.2
+    assert rectangle.south == 0.5
 
 
 class TestCamelize:
@@ -42,6 +53,23 @@ class TestToJsValue:
 
     def test_empty_list(self):
         assert to_js_value([]) == "[]"
+
+    def test_string_escapes_script_tags(self):
+        # a string containing </script> must never be able to terminate an
+        # inline script element when interpolated into an HTML page
+        result = to_js_value("</script><script>alert(1)</script>")
+        assert "</script>" not in result
+        assert "\\u003c/script\\u003e" in result
+
+    def test_enum_value_escapes_script_tags(self):
+        from enum import Enum
+
+        class _WeirdValue(str, Enum):
+            X = "</script>"
+
+        result = to_js_value(_WeirdValue.X)
+        assert "</script>" not in result
+        assert "\\u003c/script\\u003e" in result
 
 
 class TestToJsOptions:

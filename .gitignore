@@ -6,6 +6,10 @@ dist/
 build/
 .ruff_cache/
 .pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
 *.egg
 site/
 # Bundled Cesium build, fetched by scripts/fetch_cesium.py (vendor/.gitkeep

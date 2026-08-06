@@ -22,7 +22,27 @@ class CesiumBase(BaseModel):
         populate_by_name=True,
         use_enum_values=False,
         arbitrary_types_allowed=True,
+        validate_assignment=True,
     )
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Validate public field assignments and restore the prior state on failure."""
+        if name not in type(self).model_fields or name not in self.__dict__:
+            super().__setattr__(name, value)
+            return
+
+        previous_values = self.__dict__.copy()
+        previous_fields_set = self.__pydantic_fields_set__.copy()
+        previous_extra = self.__pydantic_extra__.copy() if self.__pydantic_extra__ is not None else None
+        previous_private = self.__pydantic_private__.copy() if self.__pydantic_private__ is not None else None
+        try:
+            super().__setattr__(name, value)
+        except Exception:
+            object.__setattr__(self, "__dict__", previous_values)
+            object.__setattr__(self, "__pydantic_fields_set__", previous_fields_set)
+            object.__setattr__(self, "__pydantic_extra__", previous_extra)
+            object.__setattr__(self, "__pydantic_private__", previous_private)
+            raise
 
     def _js_class_name(self) -> str:
         """Return the Cesium JS constructor name, e.g. 'Cesium.Color'."""

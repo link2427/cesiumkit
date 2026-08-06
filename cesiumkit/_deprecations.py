@@ -1,8 +1,9 @@
 """Deprecation helpers for the public API.
 
-Policy (see CONTRIBUTING): deprecate in a minor release, remove only in
-1.0. Every warning names the release that removes the feature and the
-replacement when one exists, so callers always know what to migrate to.
+Policy (see CONTRIBUTING): deprecations introduced in 1.x are removed only
+in the next major release and are announced at least one minor beforehand.
+Every warning names the release that removes the feature and the replacement
+when one exists, so callers always know what to migrate to.
 """
 
 from __future__ import annotations
@@ -14,7 +15,11 @@ from typing import Any, TypeVar, cast
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 
-DEFAULT_REMOVAL = "1.0"
+DEFAULT_REMOVAL = "2.0"
+
+
+class CesiumkitDeprecationWarning(DeprecationWarning):
+    """A deprecation emitted by cesiumkit's public API."""
 
 
 def _format_message(what: str, alternative: str | None, removal: str) -> str:
@@ -33,13 +38,13 @@ def warn_deprecated(
     """Emit a DeprecationWarning naming the removal release.
 
     Args:
-        what: The deprecated thing, e.g. ``Viewer(cesium_version=...)``.
-        alternative: What to use instead, e.g. ``show(cesium_version=...)``.
-        removal: The release that removes the feature (default "1.0").
+        what: The deprecated thing, e.g. ``Viewer(old_option=...)``.
+        alternative: What to use instead, e.g. ``Viewer(new_option=...)``.
+        removal: The release that removes the feature (default "2.0").
     """
     warnings.warn(
         _format_message(what, alternative, removal),
-        DeprecationWarning,
+        CesiumkitDeprecationWarning,
         stacklevel=2,
     )
 
@@ -67,3 +72,6 @@ def deprecated(
         return cast(_F, wrapper)
 
     return decorate
+
+
+__all__ = ["CesiumkitDeprecationWarning", "DEFAULT_REMOVAL", "deprecated", "warn_deprecated"]

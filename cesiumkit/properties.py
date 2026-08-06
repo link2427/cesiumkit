@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any
+import re
+from typing import Annotated, Any, Literal
 
-from pydantic import Field, PrivateAttr
+from pydantic import Field, PrivateAttr, field_validator
 
+from cesiumkit._deprecations import warn_deprecated
 from cesiumkit._js_serializer import to_js_value
 from cesiumkit.base import CesiumBase
 from cesiumkit.utils import JsCode
@@ -38,9 +40,9 @@ class ConstantProperty(PropertyBase):
 class SampledProperty(PropertyBase):
     """A property with time-tagged samples and interpolation."""
 
-    value_type: str = "Number"
-    interpolation_degree: int = 1
-    interpolation_algorithm: str = "LINEAR"
+    value_type: Literal["Number", "Cartesian2", "Cartesian3", "Cartesian4", "Quaternion", "Color"] | JsCode = "Number"
+    interpolation_degree: int = Field(default=1, ge=1, strict=True)
+    interpolation_algorithm: Literal["LINEAR", "LAGRANGE", "HERMITE"] = "LINEAR"
     _samples: list[tuple[str, Any]] = PrivateAttr(default_factory=list)
 
     def _js_class_name(self) -> str:
@@ -53,22 +55,27 @@ class SampledProperty(PropertyBase):
             time: ISO 8601 string or JulianDate
             value: The value at this time
         """
-        if isinstance(time, str):
-            pass
-        else:
-            iso = getattr(time, "iso8601", None)
-            if iso is not None:
-                time = iso
-        self._samples.append((time, value))
+        iso = time if isinstance(time, str) else getattr(time, "iso8601", None)
+        if not isinstance(iso, str) or not iso:
+            raise TypeError("time must be an ISO-8601 string or JulianDate")
+        self._samples.append((iso, value))
 
     def add_samples(self, times: list, values: list) -> None:
         """Add multiple samples at once."""
+        if len(times) != len(values):
+            raise ValueError("times and values must have the same length")
         for t, v in zip(times, values):
             self.add_sample(t, v)
 
     def to_js(self) -> str:
         lines = ["(function() {"]
-        lines.append(f"    var prop = new Cesium.SampledProperty({self.value_type});")
+        if isinstance(self.value_type, JsCode):
+            value_type_js = self.value_type.js_code
+        elif self.value_type == "Number":
+            value_type_js = "Number"
+        else:
+            value_type_js = f"Cesium.{self.value_type}"
+        lines.append(f"    var prop = new Cesium.SampledProperty({value_type_js});")
 
         if self.interpolation_algorithm == "LAGRANGE":
             lines.append(
@@ -82,7 +89,7 @@ class SampledProperty(PropertyBase):
             )
 
         for time_str, value in self._samples:
-            time_js = f'Cesium.JulianDate.fromIso8601("{time_str}")'
+            time_js = f"Cesium.JulianDate.fromIso8601({to_js_value(time_str)})"
             val_js = to_js_value(value)
             lines.append(f"    prop.addSample({time_js}, {val_js});")
 
@@ -94,8 +101,8 @@ class SampledProperty(PropertyBase):
 class SampledPositionProperty(PropertyBase):
     """A SampledProperty specialized for Cartesian3 positions."""
 
-    interpolation_degree: int = 1
-    interpolation_algorithm: str = "LAGRANGE"
+    interpolation_degree: int = Field(default=1, ge=1, strict=True)
+    interpolation_algorithm: Literal["LINEAR", "LAGRANGE", "HERMITE"] = "LAGRANGE"
     _samples: list[tuple[str, Any]] = PrivateAttr(default_factory=list)
 
     def _js_class_name(self) -> str:
@@ -108,16 +115,30 @@ class SampledPositionProperty(PropertyBase):
             time: ISO 8601 string or JulianDate
             position: Cartesian3 or Cartesian3FromDegrees
         """
-        if isinstance(time, str):
-            pass
-        else:
-            iso = getattr(time, "iso8601", None)
-            if iso is not None:
-                time = iso
-        self._samples.append((time, position))
+        iso = time if isinstance(time, str) else getattr(time, "iso8601", None)
+        if not isinstance(iso, str) or not iso:
+            raise TypeError("time must be an ISO-8601 string or JulianDate")
+        encoding = self._position_encoding(position)
+        if self._samples and self._position_encoding(self._samples[0][1]) != encoding:
+            raise ValueError("all sampled positions must use the same coordinate representation")
+        self._samples.append((iso, position))
+
+    @staticmethod
+    def _position_encoding(position: Any) -> str:
+        from cesiumkit.coordinates import Cartesian3, Cartesian3FromDegrees, Cartesian3FromRadians
+
+        if isinstance(position, Cartesian3FromDegrees):
+            return "cartographicDegrees"
+        if isinstance(position, Cartesian3FromRadians):
+            return "cartographicRadians"
+        if type(position) is Cartesian3:
+            return "cartesian"
+        raise TypeError("position must be a Cartesian3, Cartesian3FromDegrees, or Cartesian3FromRadians")
 
     def add_samples(self, times: list, positions: list) -> None:
         """Add multiple samples at once."""
+        if len(times) != len(positions):
+            raise ValueError("times and positions must have the same length")
         for t, p in zip(times, positions):
             self.add_sample(t, p)
 
@@ -125,7 +146,7 @@ class SampledPositionProperty(PropertyBase):
         lines = ["(function() {"]
         lines.append("    var positionProperty = new Cesium.SampledPositionProperty();")
 
-        if self.interpolation_algorithm == "LAGRANGE" and self.interpolation_degree > 1:
+        if self.interpolation_algorithm == "LAGRANGE":
             lines.append(
                 f"    positionProperty.setInterpolationOptions({{"
                 f"interpolationDegree: {self.interpolation_degree}, "
@@ -139,7 +160,7 @@ class SampledPositionProperty(PropertyBase):
             )
 
         for time_str, position in self._samples:
-            time_js = f'Cesium.JulianDate.fromIso8601("{time_str}")'
+            time_js = f"Cesium.JulianDate.fromIso8601({to_js_value(time_str)})"
             pos_js = to_js_value(position)
             lines.append(f"    positionProperty.addSample({time_js}, {pos_js});")
 
@@ -149,17 +170,16 @@ class SampledPositionProperty(PropertyBase):
 
     def to_czml(self) -> dict:
         """Export as CZML position with time-tagged samples."""
-        # Check if positions are in degrees
-        if self._samples and hasattr(self._samples[0][1], "longitude"):
+        encoding = self._position_encoding(self._samples[0][1]) if self._samples else "cartesian"
+        if encoding in {"cartographicDegrees", "cartographicRadians"}:
             values: list[Any] = []
             for time_str, pos in self._samples:
                 values.extend([time_str, pos.longitude, pos.latitude, pos.height])
-            return {"cartographicDegrees": values}
+            return {encoding: values}
         else:
             values = []
             for time_str, pos in self._samples:
-                if hasattr(pos, "x"):
-                    values.extend([time_str, pos.x, pos.y, pos.z])
+                values.extend([time_str, pos.x, pos.y, pos.z])
             return {"cartesian": values}
 
 
@@ -173,6 +193,8 @@ class TimeIntervalCollectionProperty(PropertyBase):
 
     def add_interval(self, start: str, stop: str, data: Any) -> None:
         """Add a time interval with associated data."""
+        if not isinstance(start, str) or not start or not isinstance(stop, str) or not stop:
+            raise TypeError("start and stop must be non-empty ISO-8601 strings")
         self.intervals.append({"start": start, "stop": stop, "data": data})
 
     def to_js(self) -> str:
@@ -184,8 +206,8 @@ class TimeIntervalCollectionProperty(PropertyBase):
             data_js = to_js_value(interval["data"])
             lines.append(
                 f"    prop.intervals.addInterval(new Cesium.TimeInterval({{"
-                f'start: Cesium.JulianDate.fromIso8601("{start}"), '
-                f'stop: Cesium.JulianDate.fromIso8601("{stop}"), '
+                f"start: Cesium.JulianDate.fromIso8601({to_js_value(start)}), "
+                f"stop: Cesium.JulianDate.fromIso8601({to_js_value(stop)}), "
                 f"data: {data_js}}}));"
             )
         lines.append("    return prop;")
@@ -194,35 +216,60 @@ class TimeIntervalCollectionProperty(PropertyBase):
 
 
 class CallbackProperty(PropertyBase):
-    """Property defined by a JS callback function."""
+    """Property defined by a JS callback function.
 
-    callback: Any  # JsCode
+    Wrap callbacks in :class:`JsCode`. Raw strings remain accepted through
+    1.x for compatibility with 0.x and emit a project deprecation warning.
+    """
+
+    callback: JsCode | str
     is_constant: bool = False
+
+    @field_validator("callback")
+    @classmethod
+    def _warn_for_raw_callback(cls, value: JsCode | str) -> JsCode | str:
+        if isinstance(value, str):
+            warn_deprecated(
+                "CallbackProperty(callback=<str>)",
+                alternative="CallbackProperty(callback=JsCode(...))",
+            )
+        return value
 
     def _js_class_name(self) -> str:
         return "Cesium.CallbackProperty"
 
     def to_js(self) -> str:
-        cb = self.callback
-        if isinstance(cb, JsCode):
-            cb = cb.js_code
         is_const = "true" if self.is_constant else "false"
-        return f"new Cesium.CallbackProperty({cb}, {is_const})"
+        callback = self.callback.js_code if isinstance(self.callback, JsCode) else self.callback
+        return f"new Cesium.CallbackProperty({callback}, {is_const})"
 
 
 class ReferenceProperty(PropertyBase):
     """Property that references another entity's property."""
 
-    target_collection: str = "viewer.entities"
-    target_id: str = ""
-    target_property_names: list[str] = Field(default_factory=list)
+    target_collection: str | JsCode = "viewer.entities"
+    target_id: str = Field(min_length=1)
+    target_property_names: list[Annotated[str, Field(min_length=1)]] = Field(min_length=1)
+
+    @field_validator("target_collection")
+    @classmethod
+    def _collection_is_safe_expression(cls, value: str | JsCode) -> str | JsCode:
+        dotted_identifier = r"[A-Za-z_$][A-Za-z0-9_$]*(\.[A-Za-z_$][A-Za-z0-9_$]*)*"
+        if isinstance(value, str) and re.fullmatch(dotted_identifier, value) is None:
+            raise ValueError("target_collection must be a dotted identifier or JsCode")
+        return value
 
     def _js_class_name(self) -> str:
         return "Cesium.ReferenceProperty"
 
     def to_js(self) -> str:
-        props = ", ".join(f'"{p}"' for p in self.target_property_names)
-        return f'new Cesium.ReferenceProperty({self.target_collection}, "{self.target_id}", [{props}])'
+        collection = (
+            self.target_collection.js_code if isinstance(self.target_collection, JsCode) else self.target_collection
+        )
+        return (
+            f"new Cesium.ReferenceProperty({collection}, {to_js_value(self.target_id)}, "
+            f"{to_js_value(self.target_property_names)})"
+        )
 
 
 __all__ = [

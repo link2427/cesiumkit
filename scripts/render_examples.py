@@ -12,7 +12,7 @@ Scripts that never build a viewer (no ``viewer.show()`` call and no
 module-level ``viewer``) are skipped.
 
 Requires:
-    pip install "cesiumkit[gis]" playwright
+    pip install "cesiumkit[gis,testing]"
     python -m playwright install chromium
     python scripts/fetch_cesium.py   # for offline serving
 
@@ -90,7 +90,8 @@ def main() -> int:
             print(f"FAIL {path.name}: {exc}")
             continue
         if viewer is None:
-            print(f"skip {path.name}: no viewer.show() or module-level viewer")
+            failures.append(f"{path.name}: no viewer.show() call or module-level viewer")
+            print(f"FAIL {path.name}: no viewer.show() call or module-level viewer")
             continue
         out = output_dir / f"{path.stem}.png"
         try:

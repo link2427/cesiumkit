@@ -1,3 +1,3 @@
 <div>
-<iframe srcdoc="{{ html_content }}" width="{{ width }}" height="{{ height }}" style="border:none;" allowfullscreen></iframe>
+<iframe srcdoc="{{ html_content | forceescape }}" width="{{ width | forceescape }}" height="{{ height | forceescape }}" style="border:none;" allowfullscreen></iframe>
 </div>

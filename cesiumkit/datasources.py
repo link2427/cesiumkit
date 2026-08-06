@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
-from cesiumkit._js_serializer import to_js_value
+from cesiumkit._js_serializer import to_js_options, to_js_value
 from cesiumkit.base import CesiumBase
 from cesiumkit.entities._base import EntityCollection
 
@@ -24,31 +23,47 @@ class DataSource(CesiumBase):
     def to_js(self) -> str:
         raise NotImplementedError
 
+    def _apply_loaded_options(self, expression: str) -> str:
+        """Apply common DataSource properties after an asynchronous load."""
+        assignments: list[str] = []
+        if self.name is not None:
+            assignments.append(f"dataSource.name = {to_js_value(self.name)};")
+        if not self.show:
+            assignments.append("dataSource.show = false;")
+        if not assignments:
+            return expression
+        return f"(async () => {{const dataSource = await {expression};{''.join(assignments)}return dataSource;}})()"
+
 
 class CzmlDataSource(DataSource):
     """Load CZML data."""
 
-    url: str | None = None
-    data: list[dict] | None = None
-    source_uri: str | None = None
+    url: str | None = Field(default=None, min_length=1)
+    data: list[dict[str, Any]] | None = None
+    source_uri: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _exactly_one_source(self) -> CzmlDataSource:
+        if (self.url is None) == (self.data is None):
+            raise ValueError("exactly one of url or data must be provided")
+        return self
 
     def _js_class_name(self) -> str:
         return "Cesium.CzmlDataSource"
 
     def to_js(self) -> str:
-        if self.url:
-            return f'Cesium.CzmlDataSource.load("{self.url}")'
-        elif self.data:
-            return f"Cesium.CzmlDataSource.load({json.dumps(self.data)})"
-        raise ValueError("CzmlDataSource requires url or data")
+        source = self.url if self.url is not None else self.data
+        options = {"source_uri": self.source_uri} if self.source_uri is not None else {}
+        suffix = f", {to_js_options(options)}" if options else ""
+        return self._apply_loaded_options(f"Cesium.CzmlDataSource.load({to_js_value(source)}{suffix})")
 
 
 class GeoJsonDataSource(DataSource):
     """Load GeoJSON data."""
 
-    url: str | None = None
+    url: str | None = Field(default=None, min_length=1)
     data: dict | None = None
-    source_uri: str | None = None
+    source_uri: str | None = Field(default=None, min_length=1)
     clamp_to_ground: bool = False
     stroke: Any = None  # Color
     stroke_width: float | None = None
@@ -57,74 +72,64 @@ class GeoJsonDataSource(DataSource):
     marker_symbol: str | None = None
     marker_color: Any = None  # Color
 
+    @model_validator(mode="after")
+    def _exactly_one_source(self) -> GeoJsonDataSource:
+        if (self.url is None) == (self.data is None):
+            raise ValueError("exactly one of url or data must be provided")
+        return self
+
     def _js_class_name(self) -> str:
         return "Cesium.GeoJsonDataSource"
 
     def to_js(self) -> str:
-        source = None
-        if self.url:
-            source = f'"{self.url}"'
-        elif self.data:
-            source = json.dumps(self.data)
-        else:
-            raise ValueError("GeoJsonDataSource requires url or data")
+        source = to_js_value(self.url if self.url is not None else self.data)
 
         opts: dict[str, Any] = {}
+        if self.source_uri is not None:
+            opts["source_uri"] = self.source_uri
         if self.clamp_to_ground:
-            opts["clampToGround"] = True
+            opts["clamp_to_ground"] = True
         if self.stroke is not None:
             opts["stroke"] = self.stroke
         if self.stroke_width is not None:
-            opts["strokeWidth"] = self.stroke_width
+            opts["stroke_width"] = self.stroke_width
         if self.fill is not None:
             opts["fill"] = self.fill
         if self.marker_size is not None:
-            opts["markerSize"] = self.marker_size
+            opts["marker_size"] = self.marker_size
         if self.marker_symbol is not None:
-            opts["markerSymbol"] = self.marker_symbol
+            opts["marker_symbol"] = self.marker_symbol
         if self.marker_color is not None:
-            opts["markerColor"] = self.marker_color
+            opts["marker_color"] = self.marker_color
 
         if opts:
-            # Build options manually since keys are already camelCase
-            opt_parts = []
-            for k, v in opts.items():
-                if isinstance(v, bool):
-                    opt_parts.append(f"{k}: {'true' if v else 'false'}")
-                elif isinstance(v, (int, float)):
-                    opt_parts.append(f"{k}: {v}")
-                elif isinstance(v, str):
-                    opt_parts.append(f'{k}: "{v}"')
-                elif hasattr(v, "to_js"):
-                    opt_parts.append(f"{k}: {v.to_js()}")
-                else:
-                    opt_parts.append(f"{k}: {to_js_value(v)}")
-            opts_str = ", ".join(opt_parts)
-            return f"Cesium.GeoJsonDataSource.load({source}, {{{opts_str}}})"
+            expression = f"Cesium.GeoJsonDataSource.load({source}, {to_js_options(opts)})"
+        else:
+            expression = f"Cesium.GeoJsonDataSource.load({source})"
 
-        return f"Cesium.GeoJsonDataSource.load({source})"
+        return self._apply_loaded_options(expression)
 
 
 class KmlDataSource(DataSource):
     """Load KML/KMZ data."""
 
-    url: str
+    url: str = Field(min_length=1)
     clamp_to_ground: bool = False
+    source_uri: str | None = Field(default=None, min_length=1)
 
     def _js_class_name(self) -> str:
         return "Cesium.KmlDataSource"
 
     def to_js(self) -> str:
-        opts: dict[str, Any] = {}
+        source = to_js_value(self.url)
+        options: dict[str, Any] = {}
         if self.clamp_to_ground:
-            opts["clampToGround"] = True
+            options["clamp_to_ground"] = True
+        if self.source_uri is not None:
+            options["source_uri"] = self.source_uri
+        suffix = f", {to_js_options(options)}" if options else ""
 
-        if opts:
-            opt_parts = [f"{k}: {'true' if v else 'false'}" for k, v in opts.items()]
-            opts_str = ", ".join(opt_parts)
-            return f'Cesium.KmlDataSource.load("{self.url}", {{{opts_str}}})'
-
-        return f'Cesium.KmlDataSource.load("{self.url}")'
+        return self._apply_loaded_options(f"Cesium.KmlDataSource.load({source}{suffix})")
 
 
 class CustomDataSource(DataSource):
@@ -136,9 +141,14 @@ class CustomDataSource(DataSource):
         return "Cesium.CustomDataSource"
 
     def to_js(self) -> str:
-        if self.name:
-            return f'new Cesium.CustomDataSource("{self.name}")'
-        return "new Cesium.CustomDataSource()"
+        expression = (
+            f"new Cesium.CustomDataSource({to_js_value(self.name)})"
+            if self.name is not None
+            else "new Cesium.CustomDataSource()"
+        )
+        if self.show:
+            return expression
+        return f"(() => {{const dataSource = {expression};dataSource.show = false;return dataSource;}})()"
 
 
 __all__ = [

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 
-from pydantic import PrivateAttr
+from pydantic import Field, PrivateAttr
 
 from cesiumkit.base import CesiumBase
 
@@ -12,10 +12,10 @@ from cesiumkit.base import CesiumBase
 class Color(CesiumBase):
     """Represents a Cesium color with RGBA components (0.0 to 1.0)."""
 
-    red: float = 1.0
-    green: float = 1.0
-    blue: float = 1.0
-    alpha: float = 1.0
+    red: float = Field(default=1.0, ge=0, le=1, allow_inf_nan=False)
+    green: float = Field(default=1.0, ge=0, le=1, allow_inf_nan=False)
+    blue: float = Field(default=1.0, ge=0, le=1, allow_inf_nan=False)
+    alpha: float = Field(default=1.0, ge=0, le=1, allow_inf_nan=False)
     _named: str | None = PrivateAttr(default=None)
 
     def _js_class_name(self) -> str:
@@ -49,6 +49,10 @@ class Color(CesiumBase):
     @classmethod
     def from_bytes(cls, red: int, green: int, blue: int, alpha: int = 255) -> Color:
         """Create a Color from byte values (0-255)."""
+        channels = {"red": red, "green": green, "blue": blue, "alpha": alpha}
+        for name, value in channels.items():
+            if type(value) is not int or not 0 <= value <= 255:
+                raise ValueError(f"{name} must be an integer between 0 and 255")
         return cls(
             red=red / 255.0,
             green=green / 255.0,

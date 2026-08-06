@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+import math
+from typing import Annotated
+
+from pydantic import Field, field_validator, model_validator
+
 from cesiumkit.base import CesiumBase
+
+_FiniteFloat = Annotated[float, Field(allow_inf_nan=False)]
 
 
 class Cartesian2(CesiumBase):
     """A 2D Cartesian point."""
 
-    x: float
-    y: float
+    x: _FiniteFloat
+    y: _FiniteFloat
 
     def _js_class_name(self) -> str:
         return "Cesium.Cartesian2"
@@ -24,9 +31,9 @@ class Cartesian2(CesiumBase):
 class Cartesian3(CesiumBase):
     """A 3D Cartesian point in Earth-Centered, Earth-Fixed (ECEF) coordinates."""
 
-    x: float
-    y: float
-    z: float
+    x: _FiniteFloat
+    y: _FiniteFloat
+    z: _FiniteFloat
 
     def _js_class_name(self) -> str:
         return "Cesium.Cartesian3"
@@ -92,12 +99,12 @@ class Cartesian3(CesiumBase):
 class Cartesian3FromDegrees(Cartesian3):
     """A Cartesian3 created from degrees. Serializes to Cesium.Cartesian3.fromDegrees()."""
 
-    longitude: float
-    latitude: float
-    height: float = 0.0
-    x: float = 0.0
-    y: float = 0.0
-    z: float = 0.0
+    longitude: float = Field(ge=-180, le=180, allow_inf_nan=False)
+    latitude: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    height: _FiniteFloat = 0.0
+    x: _FiniteFloat = 0.0
+    y: _FiniteFloat = 0.0
+    z: _FiniteFloat = 0.0
 
     def _js_class_name(self) -> str:
         return "Cesium.Cartesian3"
@@ -111,15 +118,15 @@ class Cartesian3FromDegrees(Cartesian3):
         return {"cartographicDegrees": [self.longitude, self.latitude, self.height]}
 
 
-class Cartesian3FromRadians(CesiumBase):
+class Cartesian3FromRadians(Cartesian3):
     """A Cartesian3 created from radians. Serializes to Cesium.Cartesian3.fromRadians()."""
 
-    longitude: float
-    latitude: float
-    height: float = 0.0
-    x: float = 0.0
-    y: float = 0.0
-    z: float = 0.0
+    longitude: float = Field(ge=-math.pi, le=math.pi, allow_inf_nan=False)
+    latitude: float = Field(ge=-math.pi / 2, le=math.pi / 2, allow_inf_nan=False)
+    height: _FiniteFloat = 0.0
+    x: _FiniteFloat = 0.0
+    y: _FiniteFloat = 0.0
+    z: _FiniteFloat = 0.0
 
     def _js_class_name(self) -> str:
         return "Cesium.Cartesian3"
@@ -136,7 +143,17 @@ class Cartesian3FromRadians(CesiumBase):
 class Cartesian3DegreesArray(CesiumBase):
     """An array of Cartesian3 from a flat degrees list. Used for polyline positions, etc."""
 
-    coordinates: list[float]
+    coordinates: list[_FiniteFloat]
+
+    @field_validator("coordinates")
+    @classmethod
+    def _validate_coordinate_pairs(cls, values: list[float]) -> list[float]:
+        if len(values) < 2 or len(values) % 2:
+            raise ValueError("coordinates must contain complete longitude/latitude pairs")
+        for longitude, latitude in zip(values[0::2], values[1::2]):
+            if not -180 <= longitude <= 180 or not -90 <= latitude <= 90:
+                raise ValueError("longitude/latitude values must be within [-180, 180] and [-90, 90]")
+        return values
 
     def _js_class_name(self) -> str:
         return "Cesium.Cartesian3"
@@ -152,7 +169,17 @@ class Cartesian3DegreesArray(CesiumBase):
 class Cartesian3DegreesArrayHeights(CesiumBase):
     """An array of Cartesian3 from a flat [lon, lat, h, ...] list."""
 
-    coordinates: list[float]
+    coordinates: list[_FiniteFloat]
+
+    @field_validator("coordinates")
+    @classmethod
+    def _validate_coordinate_triples(cls, values: list[float]) -> list[float]:
+        if len(values) < 3 or len(values) % 3:
+            raise ValueError("coordinates must contain complete longitude/latitude/height triples")
+        for longitude, latitude in zip(values[0::3], values[1::3]):
+            if not -180 <= longitude <= 180 or not -90 <= latitude <= 90:
+                raise ValueError("longitude/latitude values must be within [-180, 180] and [-90, 90]")
+        return values
 
     def _js_class_name(self) -> str:
         return "Cesium.Cartesian3"
@@ -168,9 +195,9 @@ class Cartesian3DegreesArrayHeights(CesiumBase):
 class Cartographic(CesiumBase):
     """A position defined by longitude, latitude (in radians), and height (in meters)."""
 
-    longitude: float
-    latitude: float
-    height: float = 0.0
+    longitude: float = Field(ge=-math.pi, le=math.pi, allow_inf_nan=False)
+    latitude: float = Field(ge=-math.pi / 2, le=math.pi / 2, allow_inf_nan=False)
+    height: _FiniteFloat = 0.0
 
     def _js_class_name(self) -> str:
         return "Cesium.Cartographic"
@@ -187,12 +214,12 @@ class Cartographic(CesiumBase):
         return {"cartographicRadians": [self.longitude, self.latitude, self.height]}
 
 
-class CartographicFromDegrees(CesiumBase):
+class CartographicFromDegrees(Cartographic):
     """A Cartographic created from degrees."""
 
-    longitude: float
-    latitude: float
-    height: float = 0.0
+    longitude: float = Field(ge=-180, le=180, allow_inf_nan=False)
+    latitude: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    height: _FiniteFloat = 0.0
 
     def _js_class_name(self) -> str:
         return "Cesium.Cartographic"
@@ -208,7 +235,7 @@ class BoundingSphere(CesiumBase):
     """A bounding sphere with a center and radius."""
 
     center: Cartesian3
-    radius: float
+    radius: float = Field(ge=0, allow_inf_nan=False)
 
     def _js_class_name(self) -> str:
         return "Cesium.BoundingSphere"
@@ -220,10 +247,16 @@ class BoundingSphere(CesiumBase):
 class RectangleCoords(CesiumBase):
     """A cartographic rectangle defined by west, south, east, north bounds (in radians)."""
 
-    west: float
-    south: float
-    east: float
-    north: float
+    west: float = Field(ge=-math.pi, le=math.pi, allow_inf_nan=False)
+    south: float = Field(ge=-math.pi / 2, le=math.pi / 2, allow_inf_nan=False)
+    east: float = Field(ge=-math.pi, le=math.pi, allow_inf_nan=False)
+    north: float = Field(ge=-math.pi / 2, le=math.pi / 2, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def _latitude_bounds_are_ordered(self) -> RectangleCoords:
+        if self.south > self.north:
+            raise ValueError("south must be less than or equal to north")
+        return self
 
     def _js_class_name(self) -> str:
         return "Cesium.Rectangle"
@@ -240,13 +273,13 @@ class RectangleCoords(CesiumBase):
         return {"wsenRadians": [self.west, self.south, self.east, self.north]}
 
 
-class RectangleCoordsFromDegrees(CesiumBase):
+class RectangleCoordsFromDegrees(RectangleCoords):
     """A Rectangle created from degree bounds."""
 
-    west: float
-    south: float
-    east: float
-    north: float
+    west: float = Field(ge=-180, le=180, allow_inf_nan=False)
+    south: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    east: float = Field(ge=-180, le=180, allow_inf_nan=False)
+    north: float = Field(ge=-90, le=90, allow_inf_nan=False)
 
     def _js_class_name(self) -> str:
         return "Cesium.Rectangle"
@@ -261,10 +294,16 @@ class RectangleCoordsFromDegrees(CesiumBase):
 class NearFarScalar(CesiumBase):
     """Scalar values at near and far camera distances."""
 
-    near: float
-    near_value: float
-    far: float
-    far_value: float
+    near: float = Field(ge=0, allow_inf_nan=False)
+    near_value: _FiniteFloat
+    far: float = Field(gt=0, allow_inf_nan=False)
+    far_value: _FiniteFloat
+
+    @model_validator(mode="after")
+    def _distances_are_ordered(self) -> NearFarScalar:
+        if self.far <= self.near:
+            raise ValueError("far must be greater than near")
+        return self
 
     def _js_class_name(self) -> str:
         return "Cesium.NearFarScalar"
@@ -279,8 +318,14 @@ class NearFarScalar(CesiumBase):
 class DistanceDisplayCondition(CesiumBase):
     """Display condition based on camera distance."""
 
-    near: float = 0.0
+    near: float = Field(default=0.0, ge=0, allow_inf_nan=False)
     far: float = float("inf")
+
+    @model_validator(mode="after")
+    def _distances_are_ordered(self) -> DistanceDisplayCondition:
+        if math.isnan(self.far) or self.far <= self.near:
+            raise ValueError("far must be greater than near")
+        return self
 
     def _js_class_name(self) -> str:
         return "Cesium.DistanceDisplayCondition"

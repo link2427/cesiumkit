@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from cesiumkit._js_serializer import to_js_value
 from cesiumkit.base import CesiumBase
@@ -13,35 +14,53 @@ from cesiumkit.enums import ClassificationType, SceneMode
 
 
 class ClippingPlane(CesiumBase):
-    """A single clipping plane, defined by a point and a normal.
+    """A clipping plane in Hessian normal form.
 
-    Everything on the side the normal points away from is clipped away.
-    The position and normal are ECEF :class:`Cartesian3` values; for globe
-    or tileset work you usually want a geodetic position, so build them
-    with :class:`Cartesian3FromDegrees`.
+    ``normal`` must be a normalized Cartesian vector. ``distance`` is the
+    signed shortest distance from the coordinate-system origin to the plane.
+    The coordinate system is determined by the object that owns the clipping
+    plane collection.
     """
 
-    position: Cartesian3
     normal: Cartesian3
+    distance: float = Field(allow_inf_nan=False)
+
+    @field_validator("normal")
+    @classmethod
+    def _normal_must_be_unit_cartesian(cls, value: Cartesian3) -> Cartesian3:
+        if type(value) is not Cartesian3:
+            raise ValueError("normal must be a Cartesian3 vector, not a geographic position")
+        magnitude = math.sqrt(value.x * value.x + value.y * value.y + value.z * value.z)
+        if not math.isclose(magnitude, 1.0, rel_tol=1e-9, abs_tol=1e-12):
+            raise ValueError("normal must be normalized to unit length")
+        return value
+
+    @classmethod
+    def from_point_normal(cls, point: Cartesian3, normal: Cartesian3) -> ClippingPlane:
+        """Create a plane through an ECEF or local Cartesian point."""
+        if type(point) is not Cartesian3:
+            raise ValueError("point must contain concrete Cartesian coordinates")
+        distance = -(normal.x * point.x + normal.y * point.y + normal.z * point.z)
+        return cls(normal=normal, distance=distance)
 
     def _js_class_name(self) -> str:
         return "Cesium.ClippingPlane"
 
     def to_js(self) -> str:
-        return f"new Cesium.ClippingPlane({self.position.to_js()}, {self.normal.to_js()})"
+        return f"new Cesium.ClippingPlane({self.normal.to_js()}, {self.distance})"
 
 
 class ClippingPlaneCollection(CesiumBase):
     """A set of planes used to clip tilesets, models, or the globe.
 
-    ``union`` controls how the planes combine: ``False`` (default) keeps
-    the intersection of the kept regions, ``True`` keeps the union. Planes
-    are all applied regardless; the flag only changes how they combine.
+    With ``union_clipping_regions=False`` (the default), a region is clipped
+    only when it is outside every plane. With it enabled, a region is clipped
+    when it is outside any plane.
     """
 
     planes: list[ClippingPlane] = Field(min_length=1)
     enabled: bool = True
-    union: bool = False
+    union_clipping_regions: bool = False
 
     def _js_class_name(self) -> str:
         return "Cesium.ClippingPlaneCollection"
@@ -51,8 +70,8 @@ class ClippingPlaneCollection(CesiumBase):
         opts = [f"planes: [{planes}]"]
         if not self.enabled:
             opts.append("enabled: false")
-        if self.union:
-            opts.append("union: true")
+        if self.union_clipping_regions:
+            opts.append("unionClippingRegions: true")
         return f"new Cesium.ClippingPlaneCollection({{{', '.join(opts)}}})"
 
 
@@ -63,14 +82,22 @@ class ClassificationPrimitive(CesiumBase):
     rendering its own geometry, so the polygon drapes perfectly over
     hills and buildings. The polygon ring is ``positions`` (ECEF
     :class:`Cartesian3` values, usually from :class:`Cartesian3FromDegrees`)
-    at a fixed ``height`` above the ellipsoid.
+    between ``height`` and ``extruded_height`` above the ellipsoid. Cesium
+    requires surface-following classification geometry to be a closed volume.
     """
 
     positions: list[Cartesian3] = Field(min_length=3)
     color: Any = None
     height: float = Field(default=0.0, allow_inf_nan=False)
+    extruded_height: float = Field(default=100_000.0, allow_inf_nan=False)
     classification_type: ClassificationType = ClassificationType.BOTH
     show: bool = True
+
+    @model_validator(mode="after")
+    def _require_non_degenerate_volume(self) -> ClassificationPrimitive:
+        if self.height == self.extruded_height:
+            raise ValueError("height and extruded_height must differ")
+        return self
 
     def _js_class_name(self) -> str:
         return "Cesium.ClassificationPrimitive"
@@ -90,9 +117,10 @@ class ClassificationPrimitive(CesiumBase):
             raise TypeError(f"classification color must be a Color or CSS hex string, got {type(color).__name__}")
         geometry = (
             "new Cesium.GeometryInstance({\n"
-            f"    geometry: new Cesium.PolygonGeometry.fromPositions({{\n"
+            f"    geometry: Cesium.PolygonGeometry.fromPositions({{\n"
             f"        positions: [{positions}],\n"
             f"        height: {self.height},\n"
+            f"        extrudedHeight: {self.extruded_height},\n"
             f"    }}),\n"
             f"    attributes: {{ color: Cesium.ColorGeometryInstanceAttribute.fromColor({color}) }},\n"
             "})"

@@ -16,8 +16,8 @@ providers, and configs all do. Rendering walks that tree:
    serialized viewer options, then adds entities, data sources, terrain,
    event handlers, and clock configuration in order.
 2. `Viewer.show()` serves that HTML over a local HTTP server and opens the
-   browser. The same HTML works standalone — nothing about the generated
-   page depends on the server.
+   browser. A static `to_html()` export works without the server but loads
+   CesiumJS from the CDN.
 
 ## What the local server serves
 
@@ -39,10 +39,11 @@ and the click callbacks work without rebuilding the page.
 
 Since 0.4.0 the wheel ships the CesiumJS build under
 `cesiumkit/vendor/cesium/` (fetched by `scripts/fetch_cesium.py` at release
-time). `show()` serves it from `/vendor`, so local pages run fully offline,
-including the NaturalEarthII fallback imagery used when no Ion token is
-set. `to_html()` output and the Jupyter widget have no server, so they
-reference CesiumJS on the CDN instead.
+time). `show()` serves it from `/vendor`. With an installed wheel and no
+remote scene resources, local pages can run without network access, including
+the NaturalEarthII fallback imagery used when no Ion token is set. Source
+checkouts need to run the fetch script first. `to_html()` output and the
+Jupyter widget have no server, so they reference CesiumJS on the CDN instead.
 
 ## The Jupyter widget
 

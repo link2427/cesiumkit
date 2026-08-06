@@ -33,12 +33,43 @@ least one minor release ahead (see CONTRIBUTING.md).
   combined test loads all of them at once.
 - **Benchmarks.** `scripts/benchmark.py` adds raster throughput and
   optional headless page-load timing.
+- **Release promotion gate.** Release artifacts are built once, checksum
+  verified, browser-smoked from a clean installed wheel, staged on TestPyPI,
+  and promoted to PyPI only when the published TestPyPI digests match.
 
 ### Changed
 
 - Development status classifier moved to `5 - Production/Stable`.
 - `Cartesian3FromDegrees` is now a `Cartesian3` subclass, so degree-based
   positions flow through every `Cartesian3`-typed field.
+- The deprecation gate now treats only cesiumkit's own warning category as
+  fatal; valid warnings from dependencies no longer block a release.
+
+### Deprecated
+
+- `CesiumKitWidget(cesium_version=...)` and
+  `Viewer.to_widget(cesium_version=...)` remain available for 0.x
+  compatibility but warn and will be removed in 2.0. Omit the override to use
+  the tested Cesium release.
+- `Cesium3DTileset.maximum_memory_usage` remains available through 1.x, maps
+  its MiB value to `cache_bytes`, and will be removed in 2.0.
+- Raw string callbacks in `CallbackProperty` remain available through 1.x and
+  will be removed in 2.0; wrap JavaScript callbacks in `JsCode`.
+
+### Fixed
+
+- JavaScript serialization now preserves mapping keys and safely escapes data
+  embedded in scripts and HTML.
+- Live viewers now authenticate and bound every runtime endpoint, shut down
+  cleanly, and transfer screenshots through a validated binary PNG channel.
+- Imagery, terrain, tileset, clipping, data-source, sampled-property, and raster
+  output now matches the CesiumJS 1.144 constructor and async-loading contracts.
+- Classification polygons now emit the closed extruded volume Cesium requires
+  them to render against terrain and 3D Tiles.
+- Raster readers and temporary files are isolated per request and reliably
+  released on success, failure, and cancellation.
+- The release workflow now promotes the exact artifacts tested on TestPyPI and
+  verifies tag, package-version, vendor, and published-file identities.
 
 ### Removed
 
@@ -49,11 +80,12 @@ least one minor release ahead (see CONTRIBUTING.md).
 
 ### Performance
 
-Measured with `scripts/benchmark.py` on this release:
-
-- `to_html()`: 1k entities 0.05s, 10k 0.22s, 50k 0.74s (7.2 MB HTML)
-- raster tile: ~9 ms render, ~0 ms cache hit, ~1000 tiles/s
-- headless page load + settle: 6.1s at 1k entities, 18.3s at 50k
+`scripts/benchmark.py` now reports repeated local samples: median
+serialization timing, cold versus cached tile latency, and cold-cache
+throughput across 200 distinct valid tiles. Results are intentionally not
+published as release figures because hardware, Python, and geospatial backend
+versions materially affect them. The optional browser result is labelled as
+navigation plus a fixed settle period, not a startup-time claim.
 
 ## [0.9.0] - 2026-08-05
 
@@ -96,9 +128,9 @@ Measured with `scripts/benchmark.py` on this release:
   the removal release and the replacement. The policy (deprecate in
   minors, remove at 1.0) is in CONTRIBUTING, and a CI job runs the suite
   with `-W error::DeprecationWarning` so regressions fail.
-- **Version-support policy.** cesiumkit follows SPEC 0: the three oldest
-  active Python versions, dropping the oldest at each minor release
-  (documented in CONTRIBUTING).
+- **Version-support policy.** The supported Python range is declared in package
+  metadata and CI, with SPEC 0 used as guidance when considering future floor
+  changes (documented in CONTRIBUTING).
 
 ### Deprecated
 
@@ -134,8 +166,8 @@ Measured with `scripts/benchmark.py` on this release:
 
 - Docs reorganized by Diátaxis type: how-tos are titled "How to ..." with
   numbered steps and a runnable example first; reference pages are labelled
-  as such. Slop pass removed vague language and verified every claim
-  against code (the named-color count is now 149, not 148).
+  as such. Vague claims were removed and each claim was checked against the
+  code (including the count of 148 named colors).
 - The Examples index and the Gallery cross-link, with the gallery called
   out as a curated subset of the 11 examples.
 

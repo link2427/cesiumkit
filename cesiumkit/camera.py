@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
+
+from pydantic import Field
 
 from cesiumkit._js_serializer import to_js_options, to_js_value
 from cesiumkit.base import CesiumBase
+from cesiumkit.utils import JsCode
 
 
 class CameraPosition(CesiumBase):
@@ -23,12 +27,12 @@ class FlyToOptions(CesiumBase):
 
     destination: Any
     orientation: Any = None
-    duration: float = 3.0
-    maximum_height: float | None = None
-    pitch_adjust_height: float | None = None
-    fly_over_longitude: float | None = None
-    fly_over_longitude_weight: float | None = None
-    easing_function: str | None = None
+    duration: float = Field(default=3.0, ge=0, allow_inf_nan=False)
+    maximum_height: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    pitch_adjust_height: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    fly_over_longitude: float | None = Field(default=None, allow_inf_nan=False)
+    fly_over_longitude_weight: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    easing_function: JsCode | None = None
 
     def _js_class_name(self) -> str:
         return "FlyToOptions"
@@ -55,6 +59,16 @@ class Camera:
         self._operations: list[tuple[str, dict[str, Any]]] = []
         self.initial_view: CameraPosition | None = None
 
+    @staticmethod
+    def _finite_number(value: object, name: str, *, nonnegative: bool = False) -> int | float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise TypeError(f"{name} must be a finite number")
+        if not math.isfinite(value):
+            raise ValueError(f"{name} must be finite")
+        if nonnegative and value < 0:
+            raise ValueError(f"{name} must be nonnegative")
+        return value
+
     def set_view(self, destination: Any, orientation: Any = None) -> Camera:
         """Queue a setView operation."""
         opts: dict[str, Any] = {"destination": destination}
@@ -71,6 +85,7 @@ class Camera:
         **kwargs: Any,
     ) -> Camera:
         """Queue a flyTo operation."""
+        duration = self._finite_number(duration, "duration", nonnegative=True)
         opts: dict[str, Any] = {"destination": destination, "duration": duration}
         if orientation is not None:
             opts["orientation"] = orientation
@@ -89,11 +104,13 @@ class Camera:
         Emits ``viewer.flyTo(viewer.entities, {...})``; the globe animates to
         a view containing every entity currently in the scene.
         """
+        duration = self._finite_number(duration, "duration", nonnegative=True)
         self._operations.append(("flyToEntities", {"duration": duration}))
         return self
 
     def fly_to_bounding_sphere(self, bounding_sphere: Any, duration: float = 3.0, **kwargs: Any) -> Camera:
         """Queue a flyToBoundingSphere operation."""
+        duration = self._finite_number(duration, "duration", nonnegative=True)
         opts: dict[str, Any] = {"boundingSphere": bounding_sphere, "duration": duration}
         opts.update(kwargs)
         self._operations.append(("flyToBoundingSphere", opts))
@@ -101,11 +118,15 @@ class Camera:
 
     def zoom_in(self, amount: float | None = None) -> Camera:
         """Queue a zoomIn operation."""
+        if amount is not None:
+            amount = self._finite_number(amount, "amount", nonnegative=True)
         self._operations.append(("zoomIn", {"amount": amount}))
         return self
 
     def zoom_out(self, amount: float | None = None) -> Camera:
         """Queue a zoomOut operation."""
+        if amount is not None:
+            amount = self._finite_number(amount, "amount", nonnegative=True)
         self._operations.append(("zoomOut", {"amount": amount}))
         return self
 
@@ -138,7 +159,7 @@ class Camera:
             elif method in ("zoomIn", "zoomOut"):
                 amount = opts.get("amount")
                 if amount is not None:
-                    statements.append(f"{viewer_var}.camera.{method}({amount});")
+                    statements.append(f"{viewer_var}.camera.{method}({to_js_value(amount)});")
                 else:
                     statements.append(f"{viewer_var}.camera.{method}();")
             else:

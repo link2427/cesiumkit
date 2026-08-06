@@ -26,23 +26,25 @@ exaggeration properties; `GlobeConfig` provides the Python-facing grouping.
 ## Clipping planes
 
 Tilesets, models, and the globe can be clipped by a set of planes. Each
-plane is a point plus a normal; everything on the normal's far side is
-cut away. See [How to clip and classify 3D Tiles](../guide/clipping.md).
+plane is expressed in Hessian normal form using a normalized Cartesian
+normal and a signed distance from the owning object's coordinate-system
+origin. See [How to clip and classify 3D Tiles](../guide/clipping.md).
 
 ```python
 planes = cesiumkit.ClippingPlaneCollection(
     planes=[
         cesiumkit.ClippingPlane(
-            position=cesiumkit.Cartesian3FromDegrees(longitude=-74.0, latitude=40.7, height=0),
-            normal=cesiumkit.Cartesian3(x=0, y=0, z=1),
+            normal=cesiumkit.Cartesian3(x=0, y=1, z=0),
+            distance=5.0,
         )
     ]
 )
 tileset = cesiumkit.Cesium3DTileset(url="https://example.com/tileset.json", clipping_planes=planes)
 ```
 
-`union=True` switches the collection from intersection to union of the
-kept regions; `enabled=False` keeps the planes but turns them off.
+`union_clipping_regions=True` clips a region when it is outside any plane;
+the default requires it to be outside every plane. `enabled=False` keeps
+the planes but turns clipping off.
 
 ## Classification
 
@@ -60,6 +62,11 @@ viewer.add_classification(
     color=cesiumkit.Color(red=0.0, green=0.6, blue=0.9, alpha=0.6),
 )
 ```
+
+Cesium renders surface-following classification geometry only when it is an
+extruded volume. The default spans 0 to 100,000 meters above the ellipsoid;
+set `height` and `extruded_height` to bounds that enclose the terrain or 3D
+Tiles you need to classify.
 
 ## Fog, atmosphere, and antialiasing
 

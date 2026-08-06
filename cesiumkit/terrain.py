@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from typing import Literal
 
 from pydantic import Field, model_validator
 
+from cesiumkit._js_serializer import to_js_value
 from cesiumkit.base import CesiumBase
 
 
@@ -30,7 +30,7 @@ class EllipsoidTerrainProvider(TerrainProvider):
 class CesiumTerrainProvider(TerrainProvider):
     """Provides terrain data from a Cesium terrain server."""
 
-    url: str
+    url: str = Field(min_length=1)
     request_water_mask: bool = False
     request_vertex_normals: bool = False
 
@@ -39,19 +39,19 @@ class CesiumTerrainProvider(TerrainProvider):
 
     def to_js(self) -> str:
         """Serialize to an async CesiumTerrainProvider.fromUrl(...) call."""
-        opts: dict[str, str] = {"url": json.dumps(self.url)}
+        opts: list[str] = []
         if self.request_water_mask:
-            opts["requestWaterMask"] = "true"
+            opts.append("requestWaterMask: true")
         if self.request_vertex_normals:
-            opts["requestVertexNormals"] = "true"
-        opts_str = ", ".join(f"{k}: {v}" for k, v in opts.items())
-        return f"Cesium.CesiumTerrainProvider.fromUrl({{{opts_str}}})"
+            opts.append("requestVertexNormals: true")
+        options = f", {{{', '.join(opts)}}}" if opts else ""
+        return f"Cesium.CesiumTerrainProvider.fromUrl({to_js_value(self.url)}{options})"
 
 
 class IonTerrainProvider(TerrainProvider):
     """Provides terrain from Cesium Ion (default: Cesium World Terrain)."""
 
-    asset_id: int = 1
+    asset_id: int = Field(default=1, gt=0, strict=True)
     request_water_mask: bool = False
     request_vertex_normals: bool = False
 
@@ -103,7 +103,7 @@ class _ImageHeightmapTerrainProvider(TerrainProvider):
         return f"({raw}) * {self.height_scale} + {self.height_offset}"
 
     def _custom_provider_js(self, request_url_js: str, *, tiling_scheme: str) -> str:
-        credit = f", credit: {json.dumps(self.credit)}" if self.credit is not None else ""
+        credit = f", credit: {to_js_value(self.credit)}" if self.credit is not None else ""
         transparent_height = self.height_offset
         return (
             "(() => {"
@@ -142,7 +142,7 @@ class WmsTerrainProvider(_ImageHeightmapTerrainProvider):
     grayscale pixels and permit browser CORS requests.
     """
 
-    url: str
+    url: str = Field(min_length=1)
     layers: str = Field(min_length=1)
     format: str = "image/png"
     styles: str = ""
@@ -163,14 +163,14 @@ class WmsTerrainProvider(_ImageHeightmapTerrainProvider):
             "const south = Cesium.Math.toDegrees(rectangle.south);"
             "const east = Cesium.Math.toDegrees(rectangle.east);"
             "const north = Cesium.Math.toDegrees(rectangle.north);"
-            f"const requestUrl = new URL({json.dumps(self.url)}, window.location.href);"
+            f"const requestUrl = new URL({to_js_value(self.url)}, window.location.href);"
             "requestUrl.searchParams.set('service', 'WMS');"
             "requestUrl.searchParams.set('request', 'GetMap');"
-            f"requestUrl.searchParams.set('version', {json.dumps(self.version)});"
-            f"requestUrl.searchParams.set('layers', {json.dumps(self.layers)});"
-            f"requestUrl.searchParams.set('styles', {json.dumps(self.styles)});"
-            f"requestUrl.searchParams.set('format', {json.dumps(self.format)});"
-            f"requestUrl.searchParams.set('{reference_parameter}', {json.dumps(self.crs)});"
+            f"requestUrl.searchParams.set('version', {to_js_value(self.version)});"
+            f"requestUrl.searchParams.set('layers', {to_js_value(self.layers)});"
+            f"requestUrl.searchParams.set('styles', {to_js_value(self.styles)});"
+            f"requestUrl.searchParams.set('format', {to_js_value(self.format)});"
+            f"requestUrl.searchParams.set('{reference_parameter}', {to_js_value(self.crs)});"
             f"requestUrl.searchParams.set('width', '{self.tile_width}');"
             f"requestUrl.searchParams.set('height', '{self.tile_height}');"
             f"requestUrl.searchParams.set('bbox', {bbox}.join(','));"
@@ -181,7 +181,7 @@ class WmsTerrainProvider(_ImageHeightmapTerrainProvider):
 class WmtsTerrainProvider(_ImageHeightmapTerrainProvider):
     """Adapt encoded WMTS elevation tiles into Cesium heightmap terrain."""
 
-    url: str
+    url: str = Field(min_length=1)
     layer: str = Field(min_length=1)
     tile_matrix_set: str = Field(min_length=1)
     format: str = "image/png"
@@ -190,14 +190,14 @@ class WmtsTerrainProvider(_ImageHeightmapTerrainProvider):
 
     def to_js(self) -> str:
         request_url_js = (
-            f"const requestUrl = new URL({json.dumps(self.url)}, window.location.href);"
+            f"const requestUrl = new URL({to_js_value(self.url)}, window.location.href);"
             "requestUrl.searchParams.set('service', 'WMTS');"
             "requestUrl.searchParams.set('request', 'GetTile');"
             "requestUrl.searchParams.set('version', '1.0.0');"
-            f"requestUrl.searchParams.set('layer', {json.dumps(self.layer)});"
-            f"requestUrl.searchParams.set('style', {json.dumps(self.style)});"
-            f"requestUrl.searchParams.set('format', {json.dumps(self.format)});"
-            f"requestUrl.searchParams.set('tilematrixset', {json.dumps(self.tile_matrix_set)});"
+            f"requestUrl.searchParams.set('layer', {to_js_value(self.layer)});"
+            f"requestUrl.searchParams.set('style', {to_js_value(self.style)});"
+            f"requestUrl.searchParams.set('format', {to_js_value(self.format)});"
+            f"requestUrl.searchParams.set('tilematrixset', {to_js_value(self.tile_matrix_set)});"
             "requestUrl.searchParams.set('tilematrix', String(level));"
             "requestUrl.searchParams.set('tilerow', String(y));"
             "requestUrl.searchParams.set('tilecol', String(x));"

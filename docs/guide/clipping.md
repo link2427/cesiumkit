@@ -7,9 +7,9 @@ polygon ring of `Cartesian3` points._
 ## Clip a tileset or model
 
 A `ClippingPlaneCollection` holds one or more `ClippingPlane` objects.
-Each plane is defined by a point on the plane and a normal; everything on
-the side the normal points away from is clipped away. Attach the
-collection to a tileset, a model, or the globe itself.
+Each plane uses Cesium's Hessian normal form: a normalized Cartesian
+`normal` and a signed `distance` from the owning object's coordinate-system
+origin. Attach the collection to a tileset, a model, or the globe itself.
 
 ```python
 import cesiumkit
@@ -17,19 +17,15 @@ import cesiumkit
 planes = cesiumkit.ClippingPlaneCollection(
     planes=[
         cesiumkit.ClippingPlane(
-            position=cesiumkit.Cartesian3FromDegrees(longitude=-74.0, latitude=40.7, height=0),
-            normal=cesiumkit.Cartesian3(x=0, y=0, z=1),  # up: keep everything below
+            normal=cesiumkit.Cartesian3(x=0, y=1, z=0),
+            distance=5.0,
         )
     ]
 )
 
 # clip a 3D Tiles tileset
-tileset = cesiumkit.Cesium3DTileset(
-    url="https://example.com/tileset.json",
-    clipping_planes=planes,
-)
 viewer = cesiumkit.Viewer()
-viewer.add_data_source(tileset)
+viewer.add_tileset(url="https://example.com/tileset.json", clipping_planes=planes)
 
 # clip a glTF model the same way
 viewer.add_entity(
@@ -46,10 +42,16 @@ viewer.add_entity(
 viewer = cesiumkit.Viewer(globe=cesiumkit.GlobeConfig(clipping_planes=planes))
 ```
 
-A normal of `(0, 0, 1)` at a position keeps the hemisphere below that
-plane; point the normal the other way to keep the opposite side. With
-multiple planes, `union=True` keeps the union of the kept regions
-instead of the intersection (the default).
+The example plane is at `y = -5` in the clipped object's local coordinate
+system. Its positive normal faces the origin, so Cesium clips the region
+behind the plane (`y < -5`). Use
+`ClippingPlane.from_point_normal(point, normal)` when you already have a
+concrete Cartesian point on the plane; geodetic `from_degrees` positions
+cannot be used as normal vectors.
+
+With multiple planes, `union_clipping_regions=True` clips a region when it
+is outside any plane. The default clips a region only when it is outside
+every plane.
 
 ## Classify: draw onto terrain or 3D Tiles
 
@@ -70,8 +72,13 @@ viewer.add_classification(
     ],
     color=cesiumkit.Color(red=0.0, green=0.6, blue=0.9, alpha=0.6),
     height=0.0,
+    extruded_height=100_000.0,
 )
 ```
+
+The two heights bound a closed volume that must enclose the surfaces being
+classified. Cesium does not render a surface-following classification polygon
+without extrusion; the values above are the defaults.
 
 `classification_type` controls what the polygon can paint on:
 

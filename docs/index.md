@@ -62,7 +62,7 @@ The same globe, two ways:
 - **17 entity graphics types**: point, billboard, label, polygon, polyline, box, cylinder, ellipse, ellipsoid, model, corridor, wall, rectangle, path, plane, polyline volume, tileset
 - **Particle systems**: scene primitives for smoke, fire, weather, and trails
 - **9 material types**: solid color, image, grid, stripe, checkerboard, polyline glow/arrow/dash/outline
-- **149 named colors** with `.with_alpha()` support
+- **148 named colors** with `.with_alpha()` support
 - **Time-dynamic properties**: SampledPositionProperty, SampledProperty, ConstantProperty, and more
 - **Data sources**: load GeoJSON, CZML, and KML directly
 - **8 imagery providers**: Bing, OSM, SingleTile, WMTS, WMS, URL template, Ion, TMS
@@ -74,7 +74,7 @@ The same globe, two ways:
 - **Event handling**: click events with custom JavaScript callbacks
 - **Pydantic v2 models**: full validation on all inputs
 - **Type-checked**: PEP 561 `py.typed` marker ships in the wheel; the public API is pyright-clean
-- **Works without an Ion token**: falls back to bundled offline imagery
+- **No Ion token required for local `show()`**: uses NaturalEarthII imagery
 
 ## Quick links
 

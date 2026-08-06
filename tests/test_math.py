@@ -1,5 +1,8 @@
 """Tests for cesiumkit.math module."""
 
+import pytest
+from pydantic import ValidationError
+
 from cesiumkit.math import (
     HeadingPitchRange,
     HeadingPitchRoll,
@@ -77,6 +80,11 @@ class TestMatrix3:
         m = Matrix3(values=[1, 0, 0, 0, 1, 0, 0, 0, 1])
         assert m.to_js() == "new Cesium.Matrix3(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)"
 
+    def test_requires_exactly_nine_finite_values(self):
+        for values in ([1.0] * 8, [1.0] * 10, [1.0] * 8 + [float("nan")]):
+            with pytest.raises(ValidationError):
+                Matrix3(values=values)
+
 
 class TestMatrix4:
     def test_js_class_name(self):
@@ -88,3 +96,20 @@ class TestMatrix4:
         js = m.to_js()
         assert js.startswith("new Cesium.Matrix4(")
         assert js.count(",") == 15
+
+    def test_requires_exactly_sixteen_finite_values(self):
+        for values in ([1.0] * 15, [1.0] * 17, [1.0] * 15 + [float("inf")]):
+            with pytest.raises(ValidationError):
+                Matrix4(values=values)
+
+
+def test_math_values_must_be_finite():
+    with pytest.raises(ValidationError):
+        HeadingPitchRoll(heading=float("nan"))
+    with pytest.raises(ValidationError):
+        Quaternion(x=0, y=0, z=0, w=float("inf"))
+
+
+def test_heading_pitch_range_rejects_negative_range():
+    with pytest.raises(ValidationError):
+        HeadingPitchRange(range=-1)

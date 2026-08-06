@@ -6,7 +6,7 @@ initializes and renders. Used to validate the bundled (offline) Cesium build
 end to end.
 
 Requires:
-    pip install playwright
+    pip install "cesiumkit[testing]"
     python -m playwright install chromium
 
 Usage:
@@ -20,13 +20,11 @@ import sys
 
 import cesiumkit
 from cesiumkit import testing
+from cesiumkit._vendor import vendor_dir
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--screenshot", default=None, help="path to save a PNG screenshot")
-    args = parser.parse_args()
-
+def _smoke_viewer() -> cesiumkit.Viewer:
+    """Create the deterministic scene used by each independent smoke pass."""
     viewer = cesiumkit.Viewer(title="Smoke test")
     viewer.add_entity(
         cesiumkit.Entity(
@@ -42,24 +40,42 @@ def main() -> int:
             label=cesiumkit.LabelGraphics(text="SF", pixel_offset=cesiumkit.Cartesian2(x=0, y=-24)),
         )
     )
+    return viewer
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--screenshot", default=None, help="path to save a PNG screenshot")
+    args = parser.parse_args()
 
     if args.screenshot:
-        testing.render_screenshot(viewer, args.screenshot)
+        testing.render_screenshot(_smoke_viewer(), args.screenshot)
         import os
 
         print(f"screenshot: {args.screenshot} ({os.path.getsize(args.screenshot)} bytes)")
 
-    state = testing.render_state(viewer)
+    vendor = vendor_dir()
+    if vendor is None:
+        print("FAIL: the installed package has no vendored Cesium build")
+        return 1
+
+    state = testing.render_state(_smoke_viewer(), wait_ms=10_000)
     print(f"state: {state}")
     if not state.get("ok"):
         print("FAIL: viewer did not initialize")
+        return 1
+    if state.get("cesiumScript") != "/vendor/cesium/Cesium.js":
+        print("FAIL: viewer did not load Cesium from the vendored build")
+        return 1
+    if not state.get("tilesLoaded"):
+        print("FAIL: vendored imagery tiles did not finish loading")
         return 1
     if state.get("pageErrors"):
         print("FAIL: uncaught page errors:")
         for err in state["pageErrors"]:
             print("  -", err)
         return 1
-    print("OK")
+    print(f"OK: rendered with vendored Cesium from {vendor}")
     return 0
 
 

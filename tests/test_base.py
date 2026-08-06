@@ -1,6 +1,17 @@
 """Tests for cesiumkit.base module."""
 
+import pytest
+from pydantic import ValidationError
+
 from cesiumkit._js_serializer import camelize, to_js_options, to_js_value
+from cesiumkit.coordinates import RectangleCoords
+
+
+def test_public_field_assignment_is_validated_atomically() -> None:
+    rectangle = RectangleCoords(west=-2.0, south=0.5, east=-1.0, north=1.0)
+    with pytest.raises(ValidationError, match="south must be less than or equal to north"):
+        rectangle.south = 1.2
+    assert rectangle.south == 0.5
 
 
 class TestCamelize:

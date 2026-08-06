@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import html
+from urllib.parse import urlsplit
 
 from cesiumkit._template import render_template
 
@@ -40,14 +40,27 @@ class HtmlDocument:
     def _cesium_js_url(self) -> str:
         """URL of Cesium.js: local vendor build when available, else CDN."""
         if self.cesium_base_url:
-            return f"{self.cesium_base_url}/Cesium.js"
+            return f"{self._validated_cesium_base_url()}/Cesium.js"
         return f"{_CDN_CESIUM_BASE}/{self.cesium_version}/Build/Cesium/Cesium.js"
 
     def _cesium_css_url(self) -> str:
         """URL of widgets.css, matching the Cesium.js location."""
         if self.cesium_base_url:
-            return f"{self.cesium_base_url}/Widgets/widgets.css"
+            return f"{self._validated_cesium_base_url()}/Widgets/widgets.css"
         return f"{_CDN_CESIUM_BASE}/{self.cesium_version}/Build/Cesium/Widgets/widgets.css"
+
+    def _validated_cesium_base_url(self) -> str:
+        """Return a script-safe Cesium base URL.
+
+        Relative paths and HTTP(S) URLs are supported. Rejecting executable URL
+        schemes keeps an untrusted base URL from becoming a script source.
+        """
+        if self.cesium_base_url is None:
+            raise ValueError("cesium_base_url is required")
+        scheme = urlsplit(self.cesium_base_url).scheme.lower()
+        if scheme and scheme not in {"http", "https"}:
+            raise ValueError("cesium_base_url must be a relative, HTTP, or HTTPS URL")
+        return self.cesium_base_url.rstrip("/")
 
     def render(
         self,
@@ -66,8 +79,12 @@ class HtmlDocument:
         imagery_statements: list[str] | None = None,
         terrain_statement: str | None = None,
         custom_scripts: list[str] | None = None,
+        render_runtime_bridge: bool = False,
+        session_token: str | None = None,
     ) -> str:
         """Render the complete HTML string."""
+        if render_runtime_bridge and session_token is None:
+            raise ValueError("session_token is required when render_runtime_bridge is enabled")
         return render_template(
             "viewer.html.j2",
             title=self.title,
@@ -92,14 +109,15 @@ class HtmlDocument:
             imagery_statements=imagery_statements or [],
             terrain_statement=terrain_statement,
             custom_scripts=custom_scripts or [],
+            render_runtime_bridge=render_runtime_bridge,
+            session_token=session_token,
         )
 
     def render_jupyter(self, html_content: str, width: str = "100%", height: str = "600px") -> str:
         """Render the Jupyter iframe wrapper."""
-        escaped = html.escape(html_content)
         return render_template(
             "jupyter.html.j2",
-            html_content=escaped,
+            html_content=html_content,
             width=width,
             height=height,
         )

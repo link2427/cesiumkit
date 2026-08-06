@@ -11,7 +11,7 @@ widget.
 
 ```bash
 pip install "cesiumkit[raster]"     # rio-tiler / rasterio / xarray
-pip install "cesiumkit[datashader]" # point aggregation
+pip install "cesiumkit[datashader]" # point aggregation; includes raster/GIS deps
 ```
 
 ## 2. Add a raster as the base layer

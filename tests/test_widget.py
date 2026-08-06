@@ -12,6 +12,7 @@ pytest.importorskip("anywidget")
 
 import cesiumkit  # noqa: E402
 from cesiumkit import _vendor  # noqa: E402
+from cesiumkit._deprecations import CesiumkitDeprecationWarning  # noqa: E402
 from cesiumkit.widget import CesiumKitWidget  # noqa: E402
 
 
@@ -48,7 +49,13 @@ widget.render({ model: window.__model, el: document.getElementById('target') });
 </body></html>""".replace("STATE_JSON", json.dumps(widget.state)),
             encoding="utf-8",
         )
-        handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(root))
+
+        class Handler(http.server.SimpleHTTPRequestHandler):
+            # Windows does not consistently register .mjs in mimetypes; a
+            # module script with the fallback MIME type is rejected by Chromium.
+            extensions_map = {**http.server.SimpleHTTPRequestHandler.extensions_map, ".mjs": "text/javascript"}
+
+        handler = functools.partial(Handler, directory=str(root))
         with socketserver.TCPServer(("127.0.0.1", 0), handler) as httpd:
             thread = threading.Thread(target=httpd.serve_forever, daemon=True)
             thread.start()
@@ -97,23 +104,31 @@ class TestWidgetState:
         assert "NYC" in json.dumps(state["entities"])
         assert "https://cesium.com" in state["cesiumUrl"]
 
-    def test_cesium_version_validation(self):
-        with pytest.raises(ValueError):
-            CesiumKitWidget(_viewer(), cesium_version="1")
-        with pytest.raises(ValueError):
-            CesiumKitWidget(_viewer(), cesium_version="latest")
-        with pytest.raises(ValueError):
-            CesiumKitWidget(_viewer(), cesium_version="v1.144")
-        with pytest.raises(ValueError):
-            CesiumKitWidget(_viewer(), cesium_version='1.144"));alert(1)//')
+    def test_cesium_version_is_release_pinned(self):
+        widget = CesiumKitWidget(_viewer())
+        assert "/releases/1.144/" in widget.state["cesiumUrl"]
+        assert "/releases/1.144/" in widget.state["cesiumCssUrl"]
+        assert widget.state["cesiumCssUrl"].endswith("/Widgets/widgets.css")
 
-    def test_cesium_version_accepts_pinned(self):
-        widget = CesiumKitWidget(_viewer(), cesium_version="1.115.0")
-        assert "releases/1.115.0/" in widget.state["cesiumUrl"]
+    def test_cesium_version_override_remains_deprecated_compatibility_path(self):
+        with pytest.warns(CesiumkitDeprecationWarning, match=r"removed in 2\.0"):
+            widget = CesiumKitWidget(_viewer(), cesium_version="1.115")
+        assert "/releases/1.115/" in widget.state["cesiumUrl"]
+        assert "/releases/1.115/" in widget.state["cesiumCssUrl"]
+
+    @pytest.mark.parametrize("version", ["", "latest", "1.144/evil", 1144])
+    def test_cesium_version_override_is_strictly_validated(self, version):
+        with pytest.raises((TypeError, ValueError)):
+            CesiumKitWidget(_viewer(), cesium_version=version)
 
     def test_to_widget_convenience(self):
         widget = _viewer().to_widget()
         assert isinstance(widget, CesiumKitWidget)
+
+    def test_to_widget_forwards_deprecated_version_override(self):
+        with pytest.warns(CesiumkitDeprecationWarning):
+            widget = _viewer().to_widget(cesium_version="1.115")
+        assert "/releases/1.115/" in widget.state["cesiumUrl"]
 
     def test_lazy_top_level_export(self):
         assert cesiumkit.CesiumKitWidget is CesiumKitWidget
@@ -134,18 +149,31 @@ class TestWidgetState:
 
 
 class TestEsmSyntax:
-    def test_esm_is_valid_javascript(self):
+    def test_esm_is_valid_javascript(self, tmp_path):
         node = shutil.which("node")
         if node is None:
             pytest.skip("node not available")
-        with open("/tmp/cesiumkit_widget.mjs", "w", encoding="utf-8") as f:
-            f.write(CesiumKitWidget._esm)
+        esm_path = tmp_path / "cesiumkit_widget.mjs"
+        esm_path.write_text(CesiumKitWidget._esm, encoding="utf-8")
         result = subprocess.run(
-            [node, "--check", "/tmp/cesiumkit_widget.mjs"],
+            [node, "--check", str(esm_path)],
             capture_output=True,
             text=True,
         )
         assert result.returncode == 0, result.stderr
+
+    def test_esm_has_deterministic_cleanup(self):
+        esm = CesiumKitWidget._esm
+        assert "model.off('msg:custom', onCustomMessage)" in esm
+        assert "handler.destroy()" in esm
+        assert "viewer.destroy()" in esm
+
+    def test_esm_loads_widget_css_and_disables_tokenless_services(self):
+        esm = CesiumKitWidget._esm
+        assert "_loadStylesheet(cssUrl)" in esm
+        assert "_loadCesium(state.cesiumUrl, state.cesiumCssUrl)" in esm
+        assert "link.dataset.cesiumkitCss" in esm
+        assert "if (!state.ionToken)" in esm
 
 
 class TestBridgePythonSide:
@@ -166,12 +194,38 @@ class TestBridgePythonSide:
         assert widget.get_current_time(timeout=5.0) == "2026-01-01T00:00:00Z"
         assert sent["content"]["type"] == "command"
 
+    def test_command_timeout_clears_pending_request(self):
+        widget = CesiumKitWidget(_viewer())
+        widget.send = lambda content: None  # type: ignore[method-assign]
+
+        with pytest.raises(TimeoutError, match="widget command timed out"):
+            widget._send_command("1 + 1", timeout=0)
+
+        assert widget._pending == {}
+
     def test_click_event_fires_callback(self):
         widget = CesiumKitWidget(_viewer())
         clicked = []
         widget.on_click(lambda entity_id: clicked.append(entity_id))
         widget._on_widget_message(widget, {"type": "event", "event": "click", "result": "abc"}, [])
         assert clicked == ["abc"]
+
+    def test_runtime_arguments_are_validated(self):
+        widget = CesiumKitWidget(_viewer())
+        with pytest.raises(TypeError, match="bool"):
+            widget.animate("false")
+        with pytest.raises(TypeError, match="ISO-8601"):
+            widget.set_time(123)
+        with pytest.raises(TypeError, match="callable"):
+            widget.on_click(None)
+        with pytest.raises((TypeError, ValueError), match="timeout"):
+            widget._send_command("1 + 1", timeout=float("nan"))
+
+    @pytest.mark.parametrize("multiplier", [True, "1; alert(1)", float("nan"), float("inf")])
+    def test_multiplier_rejects_non_finite_or_non_numeric_values(self, multiplier):
+        widget = CesiumKitWidget(_viewer())
+        with pytest.raises((TypeError, ValueError)):
+            widget.set_multiplier(multiplier)
 
 
 class TestWidgetRender:

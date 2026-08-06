@@ -247,6 +247,7 @@ class TestFullHtmlOutput:
 
         if _vendor.vendor_dir() is None:
             pytest.skip("bundled Cesium build not present")
+        pytest.importorskip("playwright")
         from cesiumkit.testing import render_state
 
         viewer = cesiumkit.Viewer(

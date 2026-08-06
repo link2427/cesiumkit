@@ -12,6 +12,7 @@ import cesiumkit
 from cesiumkit import _vendor
 
 pytestmark = pytest.mark.skipif(_vendor.vendor_dir() is None, reason="bundled Cesium build not present")
+pytest.importorskip("playwright")
 
 _PNG_DATA_URI = (
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ"

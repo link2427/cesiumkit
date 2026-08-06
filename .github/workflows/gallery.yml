@@ -9,56 +9,133 @@ on:
     types: [published]
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: gallery-images
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'release' && format('refs/tags/{0}', github.event.release.tag_name) || 'refs/heads/main' }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
 
-      - name: Install cesiumkit and playwright
+      - name: Verify trusted gallery source
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
         run: |
-          pip install ".[gis]" playwright
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          if [ -z "$RELEASE_TAG" ]; then
+            test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+            exit 0
+          fi
+
+          tag="$RELEASE_TAG"
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must be exactly vX.Y.Z, got: $tag" >&2
+            exit 1
+          fi
+          git show-ref --verify --quiet "refs/tags/$tag"
+          if [[ "$(git cat-file -t "refs/tags/$tag")" != "tag" ]]; then
+            echo "Release tag must be annotated: $tag" >&2
+            exit 1
+          fi
+          tag_commit="$(git rev-parse "refs/tags/$tag^{commit}")"
+          test "$(git rev-parse HEAD)" = "$tag_commit"
+          if ! git merge-base --is-ancestor "$tag_commit" origin/main; then
+            echo "Release tag must point to a commit reachable from main: $tag" >&2
+            exit 1
+          fi
+          version="$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")"
+          runtime_version="$(python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          module = ast.parse(Path("cesiumkit/_version.py").read_text(encoding="utf-8"))
+          for statement in module.body:
+              if isinstance(statement, ast.Assign) and any(
+                  isinstance(target, ast.Name) and target.id == "__version__" for target in statement.targets
+              ):
+                  print(ast.literal_eval(statement.value))
+                  break
+          else:
+              raise SystemExit("cesiumkit/_version.py does not assign __version__")
+          PY
+          )"
+          test "$tag" = "v$version"
+          test "$version" = "$runtime_version"
+
+      - name: Install cesiumkit and testing support
+        run: |
+          pip install ".[gis,testing]"
           python -m playwright install chromium --with-deps
+          python scripts/fetch_cesium.py
 
       - name: Generate gallery screenshots
         env:
-          # Optional: if the repo has a CESIUM_ION_TOKEN secret, the gallery
-          # scripts will automatically pick it up via cesiumkit.ion and render
-          # the default Cesium World Imagery. Without a token they fall back to
-          # the bundled NaturalEarthII imagery (still looks fine, just flatter).
+          # Optional: if the repo has a CESIUM_ION_TOKEN secret, gallery
+          # scripts can use Ion resources. Without one they use the vendored
+          # NaturalEarthII imagery, keeping the render path deterministic.
           CESIUM_ION_TOKEN: ${{ secrets.CESIUM_ION_TOKEN }}
         run: python scripts/render_examples.py --directory scripts/gallery --output docs/images/gallery
 
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: gallery-images
+          path: docs/images/gallery
+          if-no-files-found: error
+          retention-days: 1
+
+  publish-images:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/heads/main
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: gallery-images
+          path: ${{ runner.temp }}/gallery-images
       - name: Commit images to gallery-images branch
+        env:
+          GALLERY_ARTIFACT: ${{ runner.temp }}/gallery-images
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Stash the generated images somewhere git-agnostic. They're
-          # currently untracked on main; if we don't move them out of the
-          # working tree, `git checkout gallery-images` will refuse to
-          # switch branches because the tracked images on that branch
-          # would overwrite these untracked ones.
-          mkdir -p /tmp/gallery-images
-          cp -r docs/images/gallery/* /tmp/gallery-images/
-          rm -rf docs/images/gallery
-
-          # Check out or create the gallery-images orphan branch
-          git fetch origin gallery-images || true
-          if git show-ref --verify --quiet refs/remotes/origin/gallery-images; then
-            git checkout gallery-images
+          # Check out or create the gallery-images orphan branch. A network or
+          # authentication failure must not be mistaken for a missing branch.
+          if git ls-remote --exit-code --heads origin gallery-images >/dev/null; then
+            git fetch --no-tags origin +refs/heads/gallery-images:refs/remotes/origin/gallery-images
+            git checkout -B gallery-images origin/gallery-images
           else
+            status=$?
+            if [ "$status" -ne 2 ]; then exit "$status"; fi
             git checkout --orphan gallery-images
             git rm -rf . || true
           fi
 
+          rm -rf docs/images/gallery
           mkdir -p docs/images/gallery
-          cp /tmp/gallery-images/* docs/images/gallery/
-          git add docs/images/gallery
-          git commit -m "Update gallery images [skip ci]" || echo "No changes"
-          git push origin gallery-images --force
+          cp "$GALLERY_ARTIFACT"/* docs/images/gallery/
+          git add -A docs/images/gallery
+          if git diff --cached --quiet; then
+            echo "No gallery image changes"
+          else
+            git commit -m "Update gallery images [skip ci]"
+            auth="$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"
+            git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" push origin gallery-images
+          fi

@@ -1,6 +1,7 @@
 """Tests for local raster tile serving (requires the [raster] extras)."""
 
 import io
+from pathlib import Path
 
 import pytest
 
@@ -123,6 +124,9 @@ class TestViewerRaster:
         viewer = cesiumkit.Viewer()
         with pytest.raises(ValueError):
             viewer.add_raster(bounded_tif, opacity=1.5)
+        for opacity in (True, float("nan"), float("inf")):
+            with pytest.raises((TypeError, ValueError)):
+                viewer.add_raster(bounded_tif, opacity=opacity)
 
     def test_add_wmts_layer(self):
         viewer = cesiumkit.Viewer()
@@ -176,33 +180,39 @@ class TestViewerRaster:
         with pytest.raises(TypeError):
             # bool is an int subclass but is not a valid zoom level
             viewer.add_wmts_layer("https://example.com/wmts", layer="topo", maximum_level=True)
+        with pytest.raises(ValueError):
+            viewer.add_wmts_layer("https://example.com/wmts", layer="topo", maximum_level=-1)
 
-    def test_cross_kind_layers_keep_add_order(self):
+    def test_cross_kind_layers_keep_add_order(self, bounded_tif):
         viewer = cesiumkit.Viewer()
-        viewer.add_raster("dummy.tif")  # base layer
+        viewer.add_raster(bounded_tif)  # base layer
         viewer.add_wmts_layer("https://example.com/wmts", layer="topo")
-        viewer.add_raster("dummy2.tif", name="second")
+        viewer.add_raster(bounded_tif, name="second")
         html = viewer.to_html()
         wmts_at = html.find("const _wmtsLayer1 = viewer.imageryLayers.addImageryProvider(")
         raster_at = html.find("const _rasterLayer2 = viewer.imageryLayers.addImageryProvider(")
         assert wmts_at != -1 and raster_at != -1
         assert wmts_at < raster_at, "layers must stack in add order, WMTS and raster alike"
 
-    def test_wmts_first_then_raster(self):
+    def test_wmts_first_then_raster(self, bounded_tif):
         viewer = cesiumkit.Viewer()
         viewer.add_wmts_layer("https://example.com/wmts", layer="topo")
-        viewer.add_raster("dummy.tif")
+        viewer.add_raster(bounded_tif)
         html = viewer.to_html()
         # the raster still becomes the base layer; the WMTS is the overlay
         assert "const _wmtsLayer0 = viewer.imageryLayers.addImageryProvider(" in html
         assert "const _rasterLayer" not in html
 
-    def test_add_raster_warns_when_replacing_imagery_provider(self):
+    def test_add_raster_warns_when_replacing_imagery_provider(self, bounded_tif):
         viewer = cesiumkit.Viewer(
             imagery_provider=cesiumkit.UrlTemplateImageryProvider(url="https://example.com/{z}/{x}/{y}.png")
         )
         with pytest.warns(UserWarning):
-            viewer.add_raster("dummy.tif")
+            viewer.add_raster(bounded_tif)
+
+    def test_add_raster_fails_fast_for_missing_file(self, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            cesiumkit.Viewer().add_raster(tmp_path / "missing.tif")
 
     def test_add_points_colormap_convenience(self, bounded_tif):
         pytest.importorskip("datashader")
@@ -226,6 +236,7 @@ class TestViewerRaster:
 
         if _vendor.vendor_dir() is None:
             pytest.skip("bundled Cesium build not present")
+        pytest.importorskip("playwright")
         from cesiumkit.testing import render_state
 
         viewer = cesiumkit.Viewer()
@@ -273,12 +284,15 @@ class TestAggregatePoints:
             geometry=[Point(-75, 40), Point(-74, 41), Point(-73, 39)],
             crs="EPSG:4326",
         )
-        path = cesiumkit.aggregate_points_to_raster(gdf)
-        source = RasterSource(path)
-        body = source.tile(0, 0, 0)
-        assert body is not None
-        assert body[:8] == b"\x89PNG\r\n\x1a\n"
-        assert io.BytesIO(body).getbuffer().nbytes > 0
+        path = Path(cesiumkit.aggregate_points_to_raster(gdf))
+        try:
+            with RasterSource(path) as source:
+                body = source.tile(0, 0, 0)
+                assert body is not None
+                assert body[:8] == b"\x89PNG\r\n\x1a\n"
+                assert io.BytesIO(body).getbuffer().nbytes > 0
+        finally:
+            path.unlink(missing_ok=True)
 
     def test_add_points_wires_raster_layer(self):
         pytest.importorskip("datashader")
@@ -293,3 +307,44 @@ class TestAggregatePoints:
         html = viewer.to_html()
         assert f"/raster/{raster.id}/" in html
         assert "UrlTemplateImageryProvider" in html
+        viewer.close()
+
+    def test_add_points_forwards_layer_options_and_rejects_unknown_options(self):
+        pytest.importorskip("datashader")
+        pytest.importorskip("geopandas")
+        import geopandas as gpd
+        from shapely.geometry import Point
+
+        gdf = gpd.GeoDataFrame(geometry=[Point(-75, 40), Point(-74, 41)], crs="EPSG:4326")
+        viewer = cesiumkit.Viewer()
+        viewer.add_points(gdf, opacity=0.5, maximum_level=8)
+        assert "viewer.imageryLayers.get(0).alpha = 0.5" in viewer.to_html()
+        viewer.close()
+        with pytest.raises(TypeError, match="unexpected aggregation options"):
+            cesiumkit.Viewer().add_points(gdf, unsupported=True)
+
+    def test_aggregate_rejects_missing_crs_and_non_points(self):
+        pytest.importorskip("datashader")
+        pytest.importorskip("geopandas")
+        import geopandas as gpd
+        from shapely.geometry import LineString, Point
+
+        with pytest.raises(ValueError, match="coordinate reference system"):
+            cesiumkit.aggregate_points_to_raster(gpd.GeoDataFrame(geometry=[Point(0, 0)]))
+        with pytest.raises(ValueError, match="Point geometries"):
+            cesiumkit.aggregate_points_to_raster(
+                gpd.GeoDataFrame(geometry=[LineString([(0, 0), (1, 1)])], crs="EPSG:4326")
+            )
+
+    def test_viewer_close_removes_owned_aggregate_raster(self):
+        pytest.importorskip("datashader")
+        pytest.importorskip("geopandas")
+        import geopandas as gpd
+        from shapely.geometry import Point
+
+        viewer = cesiumkit.Viewer()
+        raster = viewer.add_points(gpd.GeoDataFrame(geometry=[Point(-75, 40), Point(-74, 41)], crs="EPSG:4326"))
+        path = Path(raster.path)
+        assert path.is_file()
+        viewer.close()
+        assert not path.exists()

@@ -14,9 +14,8 @@ offline-friendly, in about 20 lines._
 pip install cesiumkit
 ```
 
-Requires Python 3.10+. No external binary dependencies. The published wheel
-includes a bundled Cesium build, so it also works fully offline (see
-[Offline use](#7-offline-use)).
+Requires Python 3.10+. No external binary dependencies. Published wheels
+include CesiumJS for local `show()` sessions (see [Offline use](#7-offline-use)).
 
 ## 2. Create a viewer and add a point
 
@@ -69,8 +68,9 @@ This opens your default browser with an interactive 3D globe. Press
 
 ## 5. Add a Cesium Ion token (optional)
 
-Many features work without a token using bundled offline imagery. For Bing
-imagery, world terrain, or 3D Tilesets, get a free token at
+With `Viewer.show()`, an installed wheel uses bundled NaturalEarthII imagery
+when no token or imagery provider is configured. For Bing imagery, world
+terrain, or 3D Tilesets, get a free token at
 [cesium.com/ion](https://cesium.com/ion/):
 
 ```python
@@ -86,15 +86,15 @@ cesiumkit.Ion.set_default_token("your-token-here")
 
 ## 7. Offline use
 
-By default pages load CesiumJS from the CDN. To run fully offline
-(air-gapped machines, CI, headless servers), vendor the Cesium build once
-and `show()` serves it locally, including the NaturalEarthII fallback
-imagery:
+Published wheels already include CesiumJS 1.144. `Viewer.show()` serves that
+local build and its NaturalEarthII imagery, so it can run without network
+access when the scene does not request remote imagery, terrain, data, or Ion
+resources. Source checkouts leave the large vendor directory out of Git; fetch
+it before testing an offline local server:
 
 ```bash
 python scripts/fetch_cesium.py
 ```
 
-The wheel published to PyPI already includes the vendored build, so
-`pip install cesiumkit` works offline out of the box. Static HTML export
-and Jupyter embedding still load from the CDN.
+`to_html()`/`save()` and Jupyter embedding always load Cesium from the CDN;
+the package does not currently produce an offline standalone static export.

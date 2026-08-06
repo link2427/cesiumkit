@@ -1,6 +1,6 @@
 # Color
 
-Color with RGBA components (0.0 to 1.0), 149 named colors, and
+Color with RGBA components (0.0 to 1.0), 148 named colors, and
 `.with_alpha()` for transparency.
 
 ```python

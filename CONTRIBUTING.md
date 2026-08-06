@@ -6,21 +6,27 @@ Thanks for your interest in contributing! This guide will get you set up and exp
 
 ```bash
 # Clone the repo
-git clone https://github.com/jacobs-github/cesiumkit.git
+git clone https://github.com/link2427/cesiumkit.git
 cd cesiumkit
 
 # Create a virtual environment
 python -m venv .venv
-source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+source .venv/bin/activate
 
 # Install in editable mode with dev dependencies
 pip install -e ".[dev]"
 ```
 
+On Windows PowerShell, activate the environment with:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
 ## Running tests
 
 ```bash
-# Run all tests
+# Run the core test suite (tests for unavailable optional features are skipped)
 pytest
 
 # Run with coverage
@@ -30,7 +36,17 @@ pytest --cov=cesiumkit
 pytest tests/test_viewer.py
 ```
 
-All 143+ tests should pass. Please ensure tests pass before submitting a PR.
+To run the complete suite, install every feature used by the tests and the
+Playwright browser:
+
+```bash
+pip install -e ".[dev,gis,raster,datashader,images,testing,widget]"
+python -m playwright install chromium
+pytest
+```
+
+All tests should pass. Please ensure the relevant tests pass before submitting
+a PR.
 
 ## Project structure
 
@@ -150,7 +166,8 @@ my_type: MyTypeGraphics | None = None
 - **Snake case** for Python fields, auto-converted to camelCase for JavaScript via `camelize()`.
 - **Type hints** on all public methods.
 - Field defaults should match CesiumJS defaults where possible.
-- Keep `__init__.py` exports alphabetically sorted by class name.
+- Declare public exports explicitly in `__all__`. Preserve the established
+  export order unless an intentional API-contract change updates its tests.
 
 ## Submitting a PR
 
@@ -172,7 +189,7 @@ deprecations land in a minor and removal happens at the next minor that
 announces it, or at 1.0 for items deprecated in 0.8. The 0.x era is the
 only time removals are allowed on this cadence.
 
-- To deprecate an API, emit a `DeprecationWarning` via
+- To deprecate an API, emit `CesiumkitDeprecationWarning` via
   `cesiumkit._deprecations` (`warn_deprecated` for constructor params and
   attributes, the `@deprecated` decorator for functions/methods). Every
   message names the removal release and the replacement when one exists.
@@ -181,14 +198,17 @@ only time removals are allowed on this cadence.
   section.
 - Every release that adds deprecations gets a changelog `Deprecated`
   section listing each item, its replacement, and its removal release.
-- The `deprecations` CI job runs the suite with
-  `-W error::DeprecationWarning`, so internal uses of deprecated APIs and
-  regressions fail CI. Tests that intentionally exercise a deprecated API
-  must wrap the call in `pytest.warns(DeprecationWarning)`.
+- The `deprecations` CI job treats only
+  `CesiumkitDeprecationWarning` as an error, so internal uses of deprecated
+  APIs and regressions fail without promoting valid dependency warnings to
+  release blockers. Tests that intentionally exercise a deprecated API must
+  wrap the call in `pytest.warns(CesiumkitDeprecationWarning)`.
 
 ### From 1.0 on
 
-1.0 freezes the public API. After it:
+1.0 makes the public API a compatibility contract. Additions require an
+intentional compatibility review; compatible additions may ship in a minor
+release. After it:
 
 - **Breaking changes require a major version bump.** The exported surface
   (everything in a module's `__all__`, constructor signatures, and
@@ -199,20 +219,21 @@ only time removals are allowed on this cadence.
   the removal notes from every deprecation made during 1.x.
 - The changelog keeps its `Deprecated` / `Removed` sections on every
   release that touches either.
-- The `-W error::DeprecationWarning` CI gate stays on forever: a green
-  suite is the proof that nothing internal uses a deprecated path.
+- The project-specific deprecation CI gate stays on forever: a green suite
+  is the proof that nothing internal uses a deprecated path.
 
 ## Version support
 
-cesiumkit follows [SPEC 0](https://scientific-python.org/specs/spec-0000/):
-at each release the package supports the three oldest active Python minor
-versions (at the time of writing: 3.10, 3.11, 3.12, plus the latest).
-The oldest supported version is dropped at each minor release.
+cesiumkit supports the Python versions declared by `requires-python` in
+`pyproject.toml` and exercised in CI, currently Python 3.10 through 3.14. The
+project uses [SPEC 0](https://scientific-python.org/specs/spec-0000/) as guidance
+when deciding when it is reasonable to raise the minimum, but may retain older
+versions while dependencies and CI remain healthy.
 
-- `requires-python` in `pyproject.toml` and the CI test matrix must stay in
-  sync with this policy.
-- Dependency minimums are bumped on the same cadence where practical; note
-  the change in the changelog.
+- `requires-python`, classifiers, documentation, and the CI test matrix must
+  remain in sync.
+- A Python floor or dependency-minimum change is never made in a patch release
+  and must be called out in the changelog.
 
 ## Releasing
 
@@ -222,12 +243,35 @@ Releases are cut from `main` with an annotated tag (`vX.Y.Z`, matching the
 1. Bump the version in `pyproject.toml` and `cesiumkit/_version.py`, add a
    dated `## [X.Y.Z]` entry to `CHANGELOG.md` (Keep a Changelog format), and
    merge that as a normal PR.
-2. Create the release: `gh release create vX.Y.Z --title "cesiumkit vX.Y.Z"`.
-   The release notes summarize what changed; the last line must link the
-   changelog, e.g. `Full changelog: https://github.com/link2427/cesiumkit/blob/main/CHANGELOG.md`.
-3. The release event runs `Publish to PyPI` (fetches the vendored Cesium
-   build, builds, publishes) and `Gallery` (regenerates example screenshots)
-   automatically.
-4. Verify: the publish run succeeds and `https://pypi.org/project/cesiumkit/`
+2. After that PR is merged, update local `main`, create the annotated tag, and
+   push it:
+
+   ```bash
+   git switch main
+   git pull --ff-only
+   git tag -a vX.Y.Z -m "cesiumkit vX.Y.Z"
+   git push origin vX.Y.Z
+   ```
+
+3. Create the release from that existing tag with
+   `gh release create vX.Y.Z --verify-tag --title "cesiumkit vX.Y.Z"`. The
+   release notes summarize what changed; the last line must link the changelog,
+   e.g. `Full changelog: https://github.com/link2427/cesiumkit/blob/main/CHANGELOG.md`.
+4. Before the first release, configure trusted publishers for both the
+   `testpypi` and `pypi` GitHub environments. Require approval for the `pypi`
+   environment; it is the final production gate. Also enable GitHub private
+   vulnerability reporting so the reporting path in `SECURITY.md` is active.
+5. The release event runs `Publish to PyPI` and `Gallery` automatically. The
+   publish workflow fetches checksum-verified Cesium, builds wheel and sdist
+   **once**, browser-smokes the installed wheel with the vendored build, then
+   uploads those exact artifacts to TestPyPI. TestPyPI's published digests and
+   a browser smoke test must pass before the `pypi` environment can promote
+   the same GitHub artifact.
+6. Re-runs use PyPI's immutable-file behavior safely: existing files are
+   skipped only after their published SHA-256 values match the staged files.
+   A digest mismatch stops the run; do not retag or reuse a version.
+   A manual workflow run requires an existing annotated `vX.Y.Z` tag and
+   refuses a branch or a tag whose version differs from `pyproject.toml`.
+7. Verify: the publish run succeeds and `https://pypi.org/project/cesiumkit/`
    shows the new version; the gallery run finishes and its screenshots are
-   committed to `gallery-images`.
+   committed to `gallery-images`; the follow-up docs run publishes them.

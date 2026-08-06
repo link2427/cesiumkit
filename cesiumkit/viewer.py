@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import base64
-import binascii
 import json
 import logging
 import math
 import queue
+import secrets
+import socket
+import struct
 import tempfile
 import threading
 import time
 import warnings
 import webbrowser
+import zlib
 from collections import deque
 from collections.abc import Callable, Iterable
 from io import BytesIO
@@ -28,7 +31,7 @@ from cesiumkit.camera import Camera
 from cesiumkit.clock import ClockConfig
 from cesiumkit.clustering import EntityClusterConfig
 from cesiumkit.czml import CzmlDocument
-from cesiumkit.enums import SceneMode, ScreenSpaceEventType, ShadowMode
+from cesiumkit.enums import ClassificationType, SceneMode, ScreenSpaceEventType, ShadowMode
 from cesiumkit.events import EventHandler
 from cesiumkit.globe import GlobeConfig
 from cesiumkit.imagery import ImageryProvider
@@ -38,11 +41,28 @@ from cesiumkit.utils import JsCode
 
 logger = logging.getLogger(__name__)
 
+_MAX_COMMAND_LOG = 1_024
+_MAX_COMMAND_BYTES = 1_048_576
+_MAX_COMMAND_LOG_BYTES = 8 * 1_048_576
+_MAX_PENDING_RUNTIME_RESULTS = 128
+_MAX_RUNTIME_EVENT_QUEUE = 256
+_MAX_RUNTIME_REQUEST_BYTES = 1_048_576
+_MAX_PENDING_SCREENSHOTS = 1
+_MAX_SCREENSHOT_BYTES = 32 * 1_048_576
+_MAX_SCREENSHOT_PIXELS = 64 * 1_048_576
+_MAX_RUNTIME_HTTP_THREADS = 32
+_RUNTIME_CONNECTION_TIMEOUT_SECONDS = 10.0
+_RUNTIME_OVERLOAD_DRAIN_SECONDS = 0.05
+_PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
 if TYPE_CHECKING:
     from PIL.Image import Image as PILImage
 
-    from cesiumkit.coordinates import Cartesian2
+    from cesiumkit.color import Color
+    from cesiumkit.coordinates import Cartesian2, Cartesian3
     from cesiumkit.entities._base import Entity
+    from cesiumkit.raster import RasterSource
+    from cesiumkit.scene import ClassificationPrimitive
 
 
 class Viewer:
@@ -154,14 +174,21 @@ class Viewer:
         if scene3d_only is not None:
             self._viewer_options["scene3DOnly"] = scene3d_only
 
-        if maximum_render_time_change is not None and (
-            not math.isfinite(maximum_render_time_change) or maximum_render_time_change < 0
-        ):
-            raise ValueError("maximum_render_time_change must be finite and non-negative")
-        if resolution_scale is not None and (not math.isfinite(resolution_scale) or resolution_scale <= 0):
-            raise ValueError("resolution_scale must be a positive finite number")
-        if target_frame_rate is not None and target_frame_rate <= 0:
-            raise ValueError("target_frame_rate must be positive")
+        if maximum_render_time_change is not None:
+            if isinstance(maximum_render_time_change, bool) or not isinstance(maximum_render_time_change, (int, float)):
+                raise TypeError("maximum_render_time_change must be a finite number")
+            if not math.isfinite(maximum_render_time_change) or maximum_render_time_change < 0:
+                raise ValueError("maximum_render_time_change must be finite and non-negative")
+        if resolution_scale is not None:
+            if isinstance(resolution_scale, bool) or not isinstance(resolution_scale, (int, float)):
+                raise TypeError("resolution_scale must be a finite number")
+            if not math.isfinite(resolution_scale) or resolution_scale <= 0:
+                raise ValueError("resolution_scale must be a positive finite number")
+        if target_frame_rate is not None:
+            if type(target_frame_rate) is not int:
+                raise TypeError("target_frame_rate must be an int")
+            if target_frame_rate <= 0:
+                raise ValueError("target_frame_rate must be positive")
         self._resolution_scale = resolution_scale
 
         # Scene/Globe/Clock config (applied post-construction)
@@ -190,12 +217,21 @@ class Viewer:
         # Runtime command queue (for live viewer control)
         self._command_seq = 0
         self._command_queue: deque[dict[str, Any]] = deque()
+        self._command_sizes: deque[int] = deque()
+        self._command_log_bytes = 0
         self._runtime_results: dict[str, Any] = {}
         self._runtime_errors: dict[str, str] = {}
+        self._pending_runtime_ids: set[str] = set()
+        self._pending_screenshot_ids: set[str] = set()
+        self._screenshot_upload_ids: set[str] = set()
         self._runtime_condition = threading.Condition()
         self._server: Any = None
+        self._server_tempdir: tempfile.TemporaryDirectory[str] | None = None
+        self._session_token: str | None = None
+        self._lifecycle_lock = threading.RLock()
+        self._closed = False
         self._click_callbacks: list[Callable[[str | None], None]] = []
-        self._click_events: queue.Queue[str | None] = queue.Queue()
+        self._click_events: queue.Queue[str | None] = queue.Queue(maxsize=_MAX_RUNTIME_EVENT_QUEUE)
         self._click_bridge_registered = False
 
     # --- Entity convenience methods ---
@@ -287,7 +323,7 @@ class Viewer:
         self._data_sources.append(ds)
         return ds
 
-    def load_kml(self, url: str = "", **kwargs: Any) -> Any:
+    def load_kml(self, url: str, **kwargs: Any) -> Any:
         """Load KML/KMZ data."""
         from cesiumkit.datasources import KmlDataSource
 
@@ -312,25 +348,28 @@ class Viewer:
 
     def add_classification(
         self,
-        positions: list[Any],
+        positions: list[Cartesian3],
         *,
-        color: Any = None,
+        color: Color | str | None = None,
         height: float = 0.0,
-        classification_type: Any = None,
-    ) -> Any:
+        extruded_height: float = 100_000.0,
+        classification_type: ClassificationType | None = None,
+    ) -> ClassificationPrimitive:
         """Draw a filled polygon onto terrain or 3D Tiles.
 
         The polygon reuses the depth of the surface it drapes over, so it
         follows hills and buildings instead of floating. ``positions`` are
-        ECEF points (use ``Cartesian3FromDegrees``); ``classification_type``
-        is one of ``ClassificationType.TERRAIN``, ``CESIUM_3D_TILE``, or
-        ``BOTH`` (the default).
+        ECEF points (use ``Cartesian3FromDegrees``). ``height`` and
+        ``extruded_height`` bound the required classification volume;
+        ``classification_type`` is one of ``ClassificationType.TERRAIN``,
+        ``CESIUM_3D_TILE``, or ``BOTH`` (the default).
         """
         from cesiumkit.scene import ClassificationPrimitive
 
         options: dict[str, Any] = {
             "positions": list(positions),
             "height": height,
+            "extruded_height": extruded_height,
         }
         if color is not None:
             options["color"] = color
@@ -345,7 +384,7 @@ class Viewer:
         name: str | None = None,
         opacity: float = 1.0,
         maximum_level: int | None = None,
-    ) -> Any:
+    ) -> RasterSource:
         """Display a local raster (GeoTIFF/COG path or xarray DataArray).
 
         Requires ``[raster]`` extras (rio-tiler/rasterio/xarray). The raster
@@ -359,10 +398,7 @@ class Viewer:
         """
         from cesiumkit.raster import RasterSource
 
-        if not 0.0 <= opacity <= 1.0:
-            raise ValueError("opacity must be between 0.0 and 1.0")
-        if maximum_level is not None and type(maximum_level) is not int:
-            raise TypeError("maximum_level must be an int or None")
+        self._validate_layer_options(opacity=opacity, maximum_level=maximum_level)
         raster = RasterSource(source, name=name)
         self._raster_sources[raster.id] = raster
         from cesiumkit.imagery import UrlTemplateImageryProvider
@@ -384,6 +420,18 @@ class Viewer:
         )
         return raster
 
+    @staticmethod
+    def _validate_layer_options(*, opacity: float, maximum_level: int | None) -> None:
+        if isinstance(opacity, bool) or not isinstance(opacity, (int, float)) or not math.isfinite(opacity):
+            raise TypeError("opacity must be a finite number")
+        if not 0.0 <= opacity <= 1.0:
+            raise ValueError("opacity must be between 0.0 and 1.0")
+        if maximum_level is not None:
+            if type(maximum_level) is not int:
+                raise TypeError("maximum_level must be an int or None")
+            if maximum_level < 0:
+                raise ValueError("maximum_level must be non-negative")
+
     def add_wmts_layer(
         self,
         url: str,
@@ -404,10 +452,7 @@ class Viewer:
         the first raster is always the base. ``maximum_level`` must be a
         plain ``int`` (numpy integers are rejected).
         """
-        if not 0.0 <= opacity <= 1.0:
-            raise ValueError("opacity must be between 0.0 and 1.0")
-        if maximum_level is not None and type(maximum_level) is not int:
-            raise TypeError("maximum_level must be an int or None")
+        self._validate_layer_options(opacity=opacity, maximum_level=maximum_level)
         self._imagery_layers.append(
             {
                 "kind": "wmts",
@@ -448,8 +493,20 @@ class Viewer:
             options["colormap"] = colormap
         options.setdefault("plot_width", plot_width)
         options.setdefault("plot_height", plot_height)
+        name = kwargs.pop("name", "points")
+        opacity = kwargs.pop("opacity", 1.0)
+        maximum_level = kwargs.pop("maximum_level", None)
+        if kwargs:
+            unexpected = ", ".join(sorted(kwargs))
+            raise TypeError(f"unexpected aggregation options: {unexpected}")
         path = aggregate_points_to_raster(gdf, **options)
-        return self.add_raster(path, name=kwargs.pop("name", "points"))
+        try:
+            raster = self.add_raster(path, name=name, opacity=opacity, maximum_level=maximum_level)
+        except Exception:
+            Path(path).unlink(missing_ok=True)
+            raise
+        raster._mark_owned_path()
+        return raster
 
     def add_particle_system(self, particle_system: Any = None, **kwargs: Any) -> Any:
         """Add a :class:`cesiumkit.ParticleSystem` scene primitive."""
@@ -499,8 +556,11 @@ class Viewer:
         Raises :class:`TimeoutError` if no click arrives within ``timeout``.
         Pass ``None`` to wait indefinitely.
         """
-        if timeout is not None and (not math.isfinite(timeout) or timeout < 0):
-            raise ValueError("timeout must be a finite non-negative number or None")
+        if timeout is not None:
+            if isinstance(timeout, bool) or not isinstance(timeout, (int, float)):
+                raise TypeError("timeout must be a finite non-negative number or None")
+            if not math.isfinite(timeout) or timeout < 0:
+                raise ValueError("timeout must be a finite non-negative number or None")
         self._ensure_click_bridge()
         try:
             return self._click_events.get(timeout=timeout)
@@ -530,7 +590,19 @@ class Viewer:
         if result is not None and not isinstance(result, str):
             raise TypeError("Click event result must be a string or null")
 
-        self._click_events.put(result)
+        try:
+            self._click_events.put_nowait(result)
+        except queue.Full:
+            # Keep the most recent click without ever letting a browser
+            # request block on an unattended Python consumer.
+            try:
+                self._click_events.get_nowait()
+            except queue.Empty:  # pragma: no cover - another consumer won the race
+                pass
+            try:
+                self._click_events.put_nowait(result)
+            except queue.Full:  # pragma: no cover - another producer won the race
+                pass
         for callback in tuple(self._click_callbacks):
             try:
                 callback(result)
@@ -563,61 +635,108 @@ class Viewer:
         """Fly the camera to a bounding sphere."""
         self.camera.fly_to_bounding_sphere(bounding_sphere, duration=duration, **kwargs)
 
-    def to_widget(self, **kwargs: Any) -> Any:
+    def to_widget(self, *, height: str = "600px", cesium_version: str | None = None) -> Any:
         """Return a Jupyter widget for this viewer (requires ``[widget]`` extras)."""
         from cesiumkit.widget import CesiumKitWidget
 
-        return CesiumKitWidget(self, **kwargs)
+        return CesiumKitWidget(self, height=height, cesium_version=cesium_version)
 
     # --- Runtime clock control ---
 
     def _send_command(self, js: str) -> int:
         """Queue a JS command for the live viewer to execute."""
+        if not isinstance(js, str):
+            raise TypeError("Runtime command must be a string")
+        command_size = len(js.encode("utf-8"))
+        if command_size > _MAX_COMMAND_BYTES:
+            raise ValueError("Runtime command exceeds the 1 MiB size limit")
         with self._runtime_condition:
+            if self._closed:
+                raise RuntimeError("Viewer is closed")
+            while self._command_queue and (
+                len(self._command_queue) >= _MAX_COMMAND_LOG
+                or self._command_log_bytes + command_size > _MAX_COMMAND_LOG_BYTES
+            ):
+                self._command_queue.popleft()
+                self._command_log_bytes -= self._command_sizes.popleft()
             self._command_seq += 1
             self._command_queue.append({"seq": self._command_seq, "js": js})
+            self._command_sizes.append(command_size)
+            self._command_log_bytes += command_size
             self._runtime_condition.notify_all()
             return self._command_seq
 
+    @staticmethod
+    def _validate_runtime_timeout(timeout: float) -> None:
+        """Require a finite, non-negative timeout for browser round trips."""
+        if (
+            not isinstance(timeout, (int, float))
+            or isinstance(timeout, bool)
+            or not math.isfinite(timeout)
+            or timeout < 0
+        ):
+            raise ValueError("timeout must be a finite non-negative number")
+
     def _request_runtime_result(self, expression: str, *, timeout: float) -> Any:
         """Evaluate a JavaScript expression and wait for its JSON result."""
-        if self._server is None:
-            raise RuntimeError("The viewer must be running via show() before reading browser state")
+        self._validate_runtime_timeout(timeout)
 
         request_id = uuid4().hex
-        request_id_js = json.dumps(request_id)
-        self._send_command(
-            "(async () => {"
-            "try {"
-            f"const value = ({expression});"
-            f"await __cesiumkitPostResult({request_id_js}, value, null);"
-            "} catch (error) {"
-            f"await __cesiumkitPostResult({request_id_js}, null, String(error));"
-            "}"
-            "})();"
-        )
-        return self._wait_for_runtime_result(request_id, timeout=timeout)
+        request_id_js = to_js_value(request_id)
+        with self._runtime_condition:
+            if self._server is None or self._closed:
+                raise RuntimeError("The viewer must be running via show() before reading browser state")
+            if len(self._pending_runtime_ids) >= _MAX_PENDING_RUNTIME_RESULTS:
+                raise RuntimeError("Too many pending browser requests")
+            self._pending_runtime_ids.add(request_id)
+        try:
+            self._send_command(
+                "(async () => {"
+                "try {"
+                f"const value = ({expression});"
+                f"await __cesiumkitPostResult({request_id_js}, value, null);"
+                "} catch (error) {"
+                f"await __cesiumkitPostResult({request_id_js}, null, String(error));"
+                "}"
+                "})();"
+            )
+            return self._wait_for_runtime_result(request_id, timeout=timeout)
+        except Exception:
+            with self._runtime_condition:
+                self._pending_runtime_ids.discard(request_id)
+                self._runtime_results.pop(request_id, None)
+                self._runtime_errors.pop(request_id, None)
+            raise
 
     def _wait_for_runtime_result(self, request_id: str, *, timeout: float) -> Any:
         """Wait for a result posted by the browser runtime bridge."""
         with self._runtime_condition:
-            ready = self._runtime_condition.wait_for(
-                lambda: request_id in self._runtime_results or request_id in self._runtime_errors,
-                timeout=timeout,
-            )
-            if not ready:
-                raise TimeoutError(f"Browser response timed out after {timeout:g}s")
-            if request_id in self._runtime_errors:
-                message = self._runtime_errors.pop(request_id)
-                raise RuntimeError(f"Browser command failed: {message}")
-            return self._runtime_results.pop(request_id)
+            try:
+                ready = self._runtime_condition.wait_for(
+                    lambda: request_id in self._runtime_results or request_id in self._runtime_errors,
+                    timeout=timeout,
+                )
+                if not ready:
+                    raise TimeoutError(f"Browser response timed out after {timeout:g}s")
+                if request_id in self._runtime_errors:
+                    message = self._runtime_errors.pop(request_id)
+                    raise RuntimeError(f"Browser command failed: {message}")
+                return self._runtime_results.pop(request_id)
+            finally:
+                self._pending_runtime_ids.discard(request_id)
+                self._pending_screenshot_ids.discard(request_id)
+                self._screenshot_upload_ids.discard(request_id)
 
     def set_time(self, iso_string: str) -> None:
         """Jump the timeline to a specific ISO 8601 epoch and update the widget.
 
         Example: ``viewer.set_time(\"2024-03-15T03:00:00Z\")``
         """
-        iso_js = json.dumps(iso_string)
+        if not isinstance(iso_string, str):
+            raise TypeError("iso_string must be a string")
+        if not iso_string.strip():
+            raise ValueError("iso_string must not be empty")
+        iso_js = to_js_value(iso_string)
         self._send_command(f"viewer.clock.currentTime = Cesium.JulianDate.fromIso8601({iso_js});")
         self._send_command("if (viewer.timeline) viewer.timeline.updateFromClock();")
 
@@ -626,6 +745,8 @@ class Viewer:
 
         Example: ``viewer.animate(on=False)`` to pause.
         """
+        if not isinstance(on, bool):
+            raise TypeError("on must be a bool")
         val = "true" if on else "false"
         self._send_command(f"viewer.clock.shouldAnimate = {val};")
 
@@ -634,9 +755,11 @@ class Viewer:
 
         Example: ``viewer.set_multiplier(3600)`` for 1 hour per second.
         """
+        if isinstance(multiplier, bool) or not isinstance(multiplier, (int, float)):
+            raise TypeError("multiplier must be a finite number")
         if not math.isfinite(multiplier):
             raise ValueError("multiplier must be finite")
-        self._send_command(f"viewer.clock.multiplier = {multiplier};")
+        self._send_command(f"viewer.clock.multiplier = {multiplier!r};")
 
     def get_current_time(self, *, timeout: float = 10.0) -> str:
         """Return the live viewer clock as an ISO 8601 string."""
@@ -652,24 +775,107 @@ class Viewer:
 
     def screenshot_base64(self, *, timeout: float = 10.0) -> str:
         """Return a PNG screenshot of the live viewer as base64 text."""
-        result = self._request_runtime_result(
-            "(() => {"
-            "viewer.scene.requestRender();"
-            "viewer.scene.render();"
-            "return viewer.scene.canvas.toDataURL('image/png').split(',')[1];"
-            "})()",
-            timeout=timeout,
-        )
-        if not isinstance(result, str):
+        return base64.b64encode(self._screenshot_bytes(timeout=timeout)).decode("ascii")
+
+    def _screenshot_bytes(self, *, timeout: float) -> bytes:
+        """Return a validated live screenshot through the binary runtime route."""
+        self._validate_runtime_timeout(timeout)
+
+        request_id = uuid4().hex
+        request_id_js = to_js_value(request_id)
+        with self._runtime_condition:
+            if self._server is None or self._closed:
+                raise RuntimeError("The viewer must be running via show() before taking a screenshot")
+            if len(self._pending_runtime_ids) >= _MAX_PENDING_RUNTIME_RESULTS:
+                raise RuntimeError("Too many pending browser requests")
+            if len(self._pending_screenshot_ids) >= _MAX_PENDING_SCREENSHOTS:
+                raise RuntimeError("A screenshot request is already pending")
+            self._pending_runtime_ids.add(request_id)
+            self._pending_screenshot_ids.add(request_id)
+        try:
+            self._send_command(
+                "(async () => {"
+                "try {"
+                "viewer.scene.requestRender();"
+                "viewer.scene.render();"
+                "const blob = await new Promise((resolve, reject) => {"
+                "viewer.scene.canvas.toBlob((value) => {"
+                "if (value) resolve(value);"
+                "else reject(new Error('Failed to encode PNG screenshot'));"
+                "}, 'image/png');"
+                "});"
+                f"await __cesiumkitPostScreenshot({request_id_js}, blob);"
+                "} catch (error) {"
+                "try {"
+                f"await __cesiumkitPostResult({request_id_js}, null, String(error));"
+                "} catch (reportError) {"
+                "console.error('cesiumkit screenshot failure could not be reported:', reportError);"
+                "}"
+                "}"
+                "})();"
+            )
+            result = self._wait_for_runtime_result(request_id, timeout=timeout)
+        except Exception:
+            with self._runtime_condition:
+                self._pending_runtime_ids.discard(request_id)
+                self._pending_screenshot_ids.discard(request_id)
+                self._screenshot_upload_ids.discard(request_id)
+                self._runtime_results.pop(request_id, None)
+                self._runtime_errors.pop(request_id, None)
+            raise
+        if not isinstance(result, bytes):
             raise RuntimeError("Browser returned an invalid screenshot payload")
         return result
 
-    def _screenshot_bytes(self, *, timeout: float) -> bytes:
-        """Decode a live screenshot and validate its base64 payload."""
-        try:
-            return base64.b64decode(self.screenshot_base64(timeout=timeout), validate=True)
-        except (binascii.Error, ValueError) as exc:
-            raise RuntimeError("Browser returned malformed screenshot data") from exc
+    @staticmethod
+    def _is_valid_screenshot_png(data: bytes) -> bool:
+        """Validate the structural PNG framing without decompressing image data."""
+        if len(data) < 45 or not data.startswith(_PNG_SIGNATURE):
+            return False
+
+        offset = len(_PNG_SIGNATURE)
+        saw_idat = False
+        while offset < len(data):
+            if offset + 12 > len(data):
+                return False
+            chunk_length = struct.unpack(">I", data[offset : offset + 4])[0]
+            chunk_end = offset + 12 + chunk_length
+            if chunk_end > len(data):
+                return False
+            chunk_type = data[offset + 4 : offset + 8]
+            chunk_data = data[offset + 8 : offset + 8 + chunk_length]
+            expected_crc = struct.unpack(">I", data[offset + 8 + chunk_length : chunk_end])[0]
+            if zlib.crc32(chunk_type + chunk_data) & 0xFFFFFFFF != expected_crc:
+                return False
+
+            if offset == len(_PNG_SIGNATURE):
+                if chunk_type != b"IHDR" or chunk_length != 13:
+                    return False
+                width, height = struct.unpack(">II", chunk_data[:8])
+                if width == 0 or height == 0 or width * height > _MAX_SCREENSHOT_PIXELS:
+                    return False
+                bit_depth, color_type, compression, filter_method, interlace = chunk_data[8:]
+                valid_bit_depths = {
+                    0: {1, 2, 4, 8, 16},
+                    2: {8, 16},
+                    3: {1, 2, 4, 8},
+                    4: {8, 16},
+                    6: {8, 16},
+                }
+                if (
+                    bit_depth not in valid_bit_depths.get(color_type, set())
+                    or compression != 0
+                    or filter_method != 0
+                    or interlace not in {0, 1}
+                ):
+                    return False
+            elif chunk_type == b"IDAT":
+                saw_idat = True
+            elif chunk_type == b"IEND":
+                return chunk_length == 0 and saw_idat and chunk_end == len(data)
+
+            offset = chunk_end
+        return False
 
     def screenshot(self, path: str | PathLike[str], *, timeout: float = 10.0) -> None:
         """Save a PNG screenshot of the live viewer."""
@@ -692,7 +898,7 @@ class Viewer:
 
     def select_entity(self, entity_id: str) -> None:
         """Select a viewer entity by ID."""
-        entity_id_js = json.dumps(entity_id)
+        entity_id_js = to_js_value(entity_id)
         self._send_command(
             f"const entity = viewer.entities.getById({entity_id_js});"
             "if (entity) { viewer.selectedEntity = entity; viewer.scene.requestRender(); }"
@@ -762,7 +968,7 @@ class Viewer:
     @staticmethod
     def _data_source_update_js(source: Any, cesium_class: str) -> str:
         """Build an async command that replaces the first matching data source."""
-        source_js = json.dumps(source)
+        source_js = to_js_value(source)
         return (
             "(async () => {"
             f"const replacement = await Cesium.{cesium_class}.load({source_js});"
@@ -791,12 +997,14 @@ class Viewer:
 
         Returns an identifier that can be passed to :meth:`stop_polling`.
         """
+        if isinstance(interval, bool) or not isinstance(interval, (int, float)):
+            raise TypeError("interval must be a positive finite number")
         if not math.isfinite(interval) or interval <= 0:
             raise ValueError("interval must be a positive finite number")
 
         poller_id = uuid4().hex
-        poller_id_js = json.dumps(poller_id)
-        url_js = json.dumps(url)
+        poller_id_js = to_js_value(poller_id)
+        url_js = to_js_value(url)
         interval_ms = interval * 1000
         self._send_command(
             "(async () => {"
@@ -824,7 +1032,7 @@ class Viewer:
 
     def stop_polling(self, poller_id: str) -> None:
         """Stop a browser-side data-source poller."""
-        poller_id_js = json.dumps(poller_id)
+        poller_id_js = to_js_value(poller_id)
         self._send_command(
             "if (window.__cesiumkitPollers) {"
             f"const timer = window.__cesiumkitPollers.get({poller_id_js});"
@@ -840,6 +1048,8 @@ class Viewer:
         interval: float = 1.0,
     ) -> threading.Thread:
         """Consume CZML packet batches in a daemon thread and queue live updates."""
+        if isinstance(interval, bool) or not isinstance(interval, (int, float)):
+            raise TypeError("interval must be a positive finite number")
         if not math.isfinite(interval) or interval <= 0:
             raise ValueError("interval must be a positive finite number")
 
@@ -865,7 +1075,10 @@ class Viewer:
             # passed as `baseLayer`; the old `imageryProvider` viewer option
             # was removed in Cesium 1.144.
             if key == "base_layer" and hasattr(value, "to_js"):
-                parts.append(f"baseLayer: new Cesium.ImageryLayer({value.to_js()})")
+                if getattr(value, "requires_await", False):
+                    parts.append("baseLayer: false")
+                else:
+                    parts.append(f"baseLayer: new Cesium.ImageryLayer({value.to_js()})")
                 continue
             js_key = camelize(key)
             js_val = to_js_value(value)
@@ -921,6 +1134,18 @@ class Viewer:
         order with their own opacity instead of replacing each other.
         """
         statements: list[str] = []
+        configured_base_layer = self._viewer_options.get("base_layer")
+        if configured_base_layer is not None and getattr(configured_base_layer, "requires_await", False):
+            statements.append(
+                "(async () => {"
+                "try {"
+                f"const provider = await {configured_base_layer.to_js()};"
+                "viewer.imageryLayers.addImageryProvider(provider, 0);"
+                "} catch (error) {"
+                "console.error('Error loading imagery:', error);"
+                "}"
+                "})();"
+            )
         base_assigned = False
         for index, spec in enumerate(self._imagery_layers):
             if spec["kind"] == "raster":
@@ -1017,12 +1242,21 @@ class Viewer:
             "customScripts": self._custom_scripts,
         }
 
-    def _render_html(self, cesium_base_url: str | None = None) -> str:
+    def _render_html(
+        self,
+        cesium_base_url: str | None = None,
+        *,
+        render_runtime_bridge: bool = False,
+        session_token: str | None = None,
+    ) -> str:
         """Render the full HTML document, optionally from a local Cesium build.
 
         Args:
             cesium_base_url: URL prefix of the directory containing Cesium.js.
                 None loads Cesium from the CDN at the pinned DEFAULT_CESIUM_VERSION.
+            render_runtime_bridge: Whether to include the local-server runtime
+                bridge. Static HTML must not poll a server that does not exist.
+            session_token: Per-server credential used by the runtime bridge.
         """
         doc = HtmlDocument(
             cesium_version=DEFAULT_CESIUM_VERSION,
@@ -1049,6 +1283,8 @@ class Viewer:
             imagery_statements=self._build_imagery_statements(),
             terrain_statement=self._build_terrain_statement(),
             custom_scripts=self._custom_scripts,
+            render_runtime_bridge=render_runtime_bridge,
+            session_token=session_token,
         )
 
     def to_html(self) -> str:
@@ -1059,6 +1295,69 @@ class Viewer:
         """Save to an HTML file."""
         with open(path, "w", encoding="utf-8") as f:
             f.write(self.to_html())
+
+    def __enter__(self) -> Viewer:
+        """Return this viewer and close its runtime resources on exit."""
+        return self
+
+    def __exit__(self, _exc_type: Any, _exc: Any, _traceback: Any) -> None:
+        self.close()
+
+    def _finalize_runtime(self, expected_server: Any | None = None) -> None:
+        """Release a stopped server, its temporary directory, and rasters."""
+        with self._lifecycle_lock:
+            if expected_server is not None and self._server not in (expected_server, None):
+                return
+            if expected_server is not None and self._server is None and self._server_tempdir is None:
+                return
+            server = self._server
+            tempdir = self._server_tempdir
+            self._server = None
+            self._server_tempdir = None
+            self._session_token = None
+            self._closed = True
+
+        if server is not None:
+            try:
+                server.server_close()
+            except OSError:
+                pass
+        if tempdir is not None:
+            tempdir.cleanup()
+        for raster in tuple(self._raster_sources.values()):
+            closer = getattr(raster, "close", None)
+            if callable(closer):
+                closer()
+        with self._runtime_condition:
+            self._command_queue.clear()
+            self._command_sizes.clear()
+            self._command_log_bytes = 0
+            for request_id in self._pending_runtime_ids:
+                self._runtime_errors.setdefault(request_id, "Viewer closed")
+            self._runtime_condition.notify_all()
+
+    def close(self) -> None:
+        """Stop the local server and release all viewer-owned resources.
+
+        This method is idempotent. Closing a viewer is terminal: create a new
+        viewer to start another local runtime after resources have been freed.
+        """
+        with self._lifecycle_lock:
+            if self._closed and self._server is None and self._server_tempdir is None:
+                return
+            self._closed = True
+            server = self._server
+
+        if server is not None:
+            try:
+                server.shutdown()
+            except OSError:
+                pass
+        if server is not None and getattr(threading.current_thread(), "_cesiumkit_runtime_server", None) is server:
+            # A callback may close its Viewer from this request handler. The
+            # serve_forever() thread drains handlers after this one returns.
+            return
+        self._finalize_runtime(server)
 
     def show(self, port: int = 0, open_browser: bool = True) -> None:
         """Launch a local HTTP server and open the visualization in a browser.
@@ -1075,168 +1374,499 @@ class Viewer:
         from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
         from urllib.parse import parse_qs, urlparse
 
-        tmpdir = tempfile.mkdtemp(prefix="cesiumkit_")
-        html_path = os.path.join(tmpdir, "index.html")
+        with self._lifecycle_lock:
+            if self._closed:
+                raise RuntimeError("Viewer is closed")
+            if self._server is not None:
+                raise RuntimeError("Viewer is already being shown")
+
+        tempdir = tempfile.TemporaryDirectory(prefix="cesiumkit_")
+        server: Any | None = None
+        server_published = False
         cesium_base_url = vendor_base_url()
-        with open(html_path, "w", encoding="utf-8") as f:
-            f.write(self._render_html(cesium_base_url=cesium_base_url))
+        session_token = secrets.token_urlsafe(32)
+        try:
+            html_path = os.path.join(tempdir.name, "index.html")
+            with open(html_path, "w", encoding="utf-8") as f:
+                f.write(
+                    self._render_html(
+                        cesium_base_url=cesium_base_url,
+                        render_runtime_bridge=True,
+                        session_token=session_token,
+                    )
+                )
 
-        class Handler(SimpleHTTPRequestHandler):
-            _viewer: Any
+            class BoundedThreadingHTTPServer(ThreadingHTTPServer):
+                """Threading HTTP server with bounded, non-blocking overload handling."""
 
-            def __init__(self, *args, **kwargs):
-                super().__init__(*args, directory=tmpdir, **kwargs)
+                def __init__(self, *args: Any, **kwargs: Any) -> None:
+                    self._request_slots = threading.BoundedSemaphore(_MAX_RUNTIME_HTTP_THREADS)
+                    super().__init__(*args, **kwargs)
 
-            def translate_path(self, path):
-                # Serve the bundled Cesium build (if present) from the
-                # installed package, without copying it into the temp dir.
-                if cesium_base_url and path.startswith(cesium_base_url + "/"):
-                    vendor = vendor_dir()
-                    if vendor is None:
-                        return super().translate_path(path)
-                    rel = path[len(cesium_base_url) :].lstrip("/")
-                    vendor_root = os.path.realpath(str(vendor))
-                    target = os.path.realpath(os.path.join(vendor_root, rel))
-                    if os.path.commonpath([vendor_root, target]) != vendor_root:
-                        # Path traversal outside the vendor dir: fall through
-                        # to the base handler, which strips ".." segments and
-                        # looks under the temp dir -> 404.
-                        return super().translate_path(path)
-                    return target
-                return super().translate_path(path)
+                def process_request(self, request: Any, client_address: Any) -> None:
+                    if not self._request_slots.acquire(blocking=False):
+                        self._reject_overloaded_request(request)
+                        return
+                    try:
+                        super().process_request(request, client_address)
+                    except BaseException:
+                        self._request_slots.release()
+                        raise
 
-            def do_GET(self):
-                if self.path.startswith("/__cesiumkit_cmd"):
-                    self._handle_command_poll()
-                    return
-                if self.path.startswith("/raster/"):
-                    self._handle_raster_tile()
-                    return
-                super().do_GET()
+                def process_request_thread(self, request: Any, client_address: Any) -> None:
+                    current_thread = threading.current_thread()
+                    setattr(current_thread, "_cesiumkit_runtime_server", self)
+                    try:
+                        super().process_request_thread(request, client_address)
+                    finally:
+                        delattr(current_thread, "_cesiumkit_runtime_server")
+                        self._request_slots.release()
 
-            def _handle_raster_tile(self):
-                """Serve a Web Mercator tile from a registered raster source."""
-                parts = self.path.split("?")[0].strip("/").split("/")
-                if len(parts) != 5 or parts[0] != "raster":
-                    self.send_error(400, "Invalid raster tile path")
-                    return
-                _, source_id, z, x, y = parts
-                y = y.removesuffix(".png")
-                if not (z.isdigit() and x.isdigit() and y.isdigit()):
-                    self.send_error(400, "Invalid raster tile coordinates")
-                    return
-                source = self._viewer._raster_sources.get(source_id)
-                if source is None:
-                    self.send_error(404, "Unknown raster source")
-                    return
-                body = source.tile(int(z), int(x), int(y))
-                if body is None:
-                    self.send_error(404, "Tile out of range")
-                    return
-                self.send_response(200)
-                self.send_header("Content-Type", "image/png")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
+                @staticmethod
+                def _reject_overloaded_request(request: Any) -> None:
+                    body = b'{"error":"runtime server busy"}'
+                    response = (
+                        b"HTTP/1.1 503 Service Unavailable\r\n"
+                        b"Content-Type: application/json\r\n"
+                        b"Cache-Control: no-store\r\n"
+                        b"Connection: close\r\n" + f"Content-Length: {len(body)}\r\n\r\n".encode("ascii") + body
+                    )
+                    try:
+                        deadline = time.monotonic() + _RUNTIME_OVERLOAD_DRAIN_SECONDS
+                        request.settimeout(_RUNTIME_OVERLOAD_DRAIN_SECONDS)
+                        request.sendall(response)
+                        try:
+                            request.shutdown(socket.SHUT_WR)
+                        except OSError:
+                            pass
+                        try:
+                            while True:
+                                remaining = deadline - time.monotonic()
+                                if remaining <= 0:
+                                    break
+                                request.settimeout(remaining)
+                                if not request.recv(64 * 1024):
+                                    break
+                        except OSError:
+                            pass
+                    except OSError:
+                        pass
+                    finally:
+                        request.close()
 
-            def do_POST(self):
-                if self.path == "/__cesiumkit_result":
-                    self._handle_runtime_result()
-                    return
-                self.send_error(405)
+            class Handler(SimpleHTTPRequestHandler):
+                _viewer: Any
 
-            def _handle_command_poll(self):
-                parsed = urlparse(self.path)
-                params = parse_qs(parsed.query)
-                try:
-                    client_seq = int(params.get("seq", [0])[0])
-                except (TypeError, ValueError):
-                    self.send_error(400, "Invalid command sequence")
-                    return
+                def __init__(self, *args, **kwargs):
+                    super().__init__(*args, directory=tempdir.name, **kwargs)
 
-                with self._viewer._runtime_condition:
-                    while self._viewer._command_queue and self._viewer._command_queue[0]["seq"] <= client_seq:
-                        self._viewer._command_queue.popleft()
-                    cmd = self._viewer._command_queue[0] if self._viewer._command_queue else None
+                def setup(self) -> None:
+                    self.request.settimeout(_RUNTIME_CONNECTION_TIMEOUT_SECONDS)
+                    super().setup()
 
-                body = json.dumps(cmd or {}).encode("utf-8")
+                def parse_request(self) -> bool:
+                    if not super().parse_request():
+                        return False
+                    if not self._host_is_valid():
+                        self.send_error(421, "Invalid Host header")
+                        return False
+                    return True
 
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
+                def _host_is_valid(self) -> bool:
+                    hosts = self.headers.get_all("Host") or []
+                    if len(hosts) != 1:
+                        return False
+                    port = int(getattr(self.server, "server_port"))
+                    host = hosts[0].strip().lower()
+                    return host in {f"127.0.0.1:{port}", f"localhost:{port}"}
 
-            def _handle_runtime_result(self):
-                try:
-                    content_length = int(self.headers.get("Content-Length", "0"))
-                except ValueError:
-                    self.send_error(400, "Invalid content length")
-                    return
-                if content_length <= 0 or content_length > 100 * 1024 * 1024:
-                    self.send_error(413, "Invalid result payload size")
-                    return
+                def translate_path(self, path):
+                    # Serve the bundled Cesium build (if present) from the
+                    # installed package, without copying it into the temp dir.
+                    request_path = urlparse(path).path
+                    if cesium_base_url and request_path.startswith(cesium_base_url + "/"):
+                        vendor = vendor_dir()
+                        if vendor is None:
+                            return super().translate_path(path)
+                        rel = request_path[len(cesium_base_url) :].lstrip("/")
+                        vendor_root = os.path.realpath(str(vendor))
+                        target = os.path.realpath(os.path.join(vendor_root, rel))
+                        try:
+                            is_vendor_path = os.path.commonpath([vendor_root, target]) == vendor_root
+                        except ValueError:
+                            # Windows raises when a crafted path resolves to a
+                            # different drive. Treat it exactly like traversal.
+                            return os.path.join(tempdir.name, ".cesiumkit-invalid-vendor-path")
+                        if not is_vendor_path:
+                            return super().translate_path(path)
+                        return target
+                    return super().translate_path(path)
 
-                try:
-                    data = json.loads(self.rfile.read(content_length))
-                    if not isinstance(data, dict):
-                        raise TypeError
+                def copyfile(self, source: Any, outputfile: Any) -> None:
+                    try:
+                        super().copyfile(source, outputfile)
+                    except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, TimeoutError):
+                        return
+
+                def do_GET(self):
+                    parsed = urlparse(self.path)
+                    if parsed.path == "/__cesiumkit_cmd":
+                        try:
+                            self._handle_command_poll(parsed)
+                        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, TimeoutError):
+                            return
+                        return
+                    if parsed.path.startswith("/raster/"):
+                        try:
+                            self._handle_raster_tile(parsed)
+                        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, TimeoutError):
+                            return
+                        return
+                    super().do_GET()
+
+                def _handle_raster_tile(self, parsed: Any) -> None:
+                    """Serve a Web Mercator tile from a registered raster source."""
+                    if parsed.query:
+                        self.send_error(400, "Raster tile query parameters are not supported")
+                        return
+                    parts = parsed.path.strip("/").split("/")
+                    if len(parts) != 5 or parts[0] != "raster" or not parts[4].endswith(".png"):
+                        self.send_error(400, "Invalid raster tile path")
+                        return
+                    _, source_id, z, x, filename = parts
+                    y = filename[: -len(".png")]
+                    coordinates = (z, x, y)
+                    if not all(value.isascii() and value.isdecimal() for value in coordinates):
+                        self.send_error(400, "Invalid raster tile coordinates")
+                        return
+                    if len(z) > 2 or len(x) > 10 or len(y) > 10:
+                        self.send_error(404, "Tile out of range")
+                        return
+                    z_value, x_value, y_value = (int(value) for value in coordinates)
+                    if z_value > 30 or x_value >= 1 << z_value or y_value >= 1 << z_value:
+                        self.send_error(404, "Tile out of range")
+                        return
+                    source = self._viewer._raster_sources.get(source_id)
+                    if source is None:
+                        self.send_error(404, "Unknown raster source")
+                        return
+                    try:
+                        body = source.tile(z_value, x_value, y_value)
+                    except Exception:
+                        logger.exception("Raster tile rendering failed")
+                        self.send_error(500, "Raster tile rendering failed")
+                        return
+                    if body is None:
+                        self.send_error(404, "Tile out of range")
+                        return
+                    self.send_response(200)
+                    self.send_header("Content-Type", "image/png")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+
+                def do_POST(self):
+                    parsed = urlparse(self.path)
+                    if parsed.path == "/__cesiumkit_result" and not parsed.query:
+                        try:
+                            self._handle_runtime_result()
+                        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, TimeoutError):
+                            return
+                        return
+                    if parsed.path == "/__cesiumkit_screenshot" and not parsed.query:
+                        try:
+                            self._handle_screenshot_upload()
+                        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, TimeoutError):
+                            return
+                        return
+                    self.send_error(405)
+
+                def _session_is_valid(self, token: Any) -> bool:
+                    expected = self._viewer._session_token
+                    return isinstance(token, str) and expected is not None and secrets.compare_digest(token, expected)
+
+                def _handle_command_poll(self, parsed: Any) -> None:
+                    params = parse_qs(parsed.query, keep_blank_values=True)
+                    if set(params) != {"seq", "token"} or any(len(values) != 1 for values in params.values()):
+                        self.send_error(400, "Invalid command request")
+                        return
+                    seq_text = params["seq"][0]
+                    if not seq_text.isascii() or not seq_text.isdecimal() or len(seq_text) > 16:
+                        self.send_error(400, "Invalid command sequence")
+                        return
+                    if not self._session_is_valid(params["token"][0]):
+                        self.send_error(403, "Invalid runtime session")
+                        return
+                    client_seq = int(seq_text)
+                    with self._viewer._runtime_condition:
+                        cmd = next(
+                            (item for item in self._viewer._command_queue if item["seq"] > client_seq),
+                            None,
+                        )
+                    body = json.dumps(cmd or {}, separators=(",", ":")).encode("utf-8")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+
+                @staticmethod
+                def _is_runtime_request_id(value: Any) -> bool:
+                    return (
+                        isinstance(value, str)
+                        and len(value) == 32
+                        and all(char in "0123456789abcdef" for char in value)
+                    )
+
+                def _record_screenshot_failure(self, request_id: str, message: str) -> None:
+                    with self._viewer._runtime_condition:
+                        if (
+                            request_id in self._viewer._pending_screenshot_ids
+                            and request_id not in self._viewer._runtime_results
+                            and request_id not in self._viewer._runtime_errors
+                        ):
+                            self._viewer._runtime_errors[request_id] = message
+                            self._viewer._runtime_condition.notify_all()
+
+                def _handle_screenshot_upload(self) -> None:
+                    """Accept one bounded PNG blob for an active screenshot request."""
+                    content_type = self.headers.get("Content-Type", "")
+                    if content_type.strip().lower() != "image/png":
+                        self.send_error(415, "Expected image/png")
+                        return
+                    content_lengths = self.headers.get_all("Content-Length") or []
+                    if len(content_lengths) != 1 or self.headers.get("Transfer-Encoding"):
+                        self.send_error(400, "Invalid content length")
+                        return
+                    content_length_text = content_lengths[0]
+                    if (
+                        len(content_length_text) > 10
+                        or not content_length_text.isascii()
+                        or not content_length_text.isdecimal()
+                    ):
+                        self.send_error(400, "Invalid content length")
+                        return
+                    content_length = int(content_length_text)
+
+                    tokens = self.headers.get_all("X-CesiumKit-Token") or []
+                    request_ids = self.headers.get_all("X-CesiumKit-Request-Id") or []
+                    if len(tokens) != 1 or len(request_ids) != 1:
+                        self.send_error(400, "Invalid screenshot request")
+                        return
+                    if not self._session_is_valid(tokens[0]):
+                        self.send_error(403, "Invalid runtime session")
+                        return
+                    request_id = request_ids[0]
+                    if not self._is_runtime_request_id(request_id):
+                        self.send_error(400, "Invalid screenshot request")
+                        return
+
+                    with self._viewer._runtime_condition:
+                        if (
+                            request_id not in self._viewer._pending_screenshot_ids
+                            or request_id not in self._viewer._pending_runtime_ids
+                            or request_id in self._viewer._runtime_results
+                            or request_id in self._viewer._runtime_errors
+                        ):
+                            self.send_error(404, "Unknown screenshot request")
+                            return
+                        if request_id in self._viewer._screenshot_upload_ids:
+                            self.send_error(409, "Screenshot upload already in progress")
+                            return
+                        self._viewer._screenshot_upload_ids.add(request_id)
+
+                    try:
+                        if content_length <= 0 or content_length > _MAX_SCREENSHOT_BYTES:
+                            self._record_screenshot_failure(
+                                request_id,
+                                "Screenshot upload rejected: payload exceeds the 32 MiB limit",
+                            )
+                            self.send_error(413, "Invalid screenshot payload size")
+                            return
+                        try:
+                            body = self.rfile.read(content_length)
+                        except TimeoutError:
+                            self._record_screenshot_failure(
+                                request_id,
+                                "Screenshot upload rejected: PNG payload timed out",
+                            )
+                            return
+                        if len(body) != content_length:
+                            self._record_screenshot_failure(
+                                request_id,
+                                "Screenshot upload rejected: incomplete PNG payload",
+                            )
+                            self.send_error(400, "Incomplete screenshot payload")
+                            return
+                        if not self._viewer._is_valid_screenshot_png(body):
+                            self._record_screenshot_failure(
+                                request_id,
+                                "Screenshot upload rejected: invalid PNG payload",
+                            )
+                            self.send_error(400, "Invalid screenshot payload")
+                            return
+
+                        with self._viewer._runtime_condition:
+                            if (
+                                request_id not in self._viewer._pending_screenshot_ids
+                                or request_id not in self._viewer._pending_runtime_ids
+                                or request_id in self._viewer._runtime_results
+                                or request_id in self._viewer._runtime_errors
+                            ):
+                                self.send_error(404, "Unknown screenshot request")
+                                return
+                            self._viewer._runtime_results[request_id] = body
+                            self._viewer._runtime_condition.notify_all()
+                        self._send_json_success()
+                    finally:
+                        with self._viewer._runtime_condition:
+                            self._viewer._screenshot_upload_ids.discard(request_id)
+
+                def _handle_runtime_result(self) -> None:
+                    content_type = self.headers.get("Content-Type", "")
+                    if content_type.split(";", 1)[0].strip().lower() != "application/json":
+                        self.send_error(415, "Expected application/json")
+                        return
+                    tokens = self.headers.get_all("X-CesiumKit-Token") or []
+                    if len(tokens) != 1:
+                        self.send_error(400, "Invalid runtime session")
+                        return
+                    if not self._session_is_valid(tokens[0]):
+                        self.send_error(403, "Invalid runtime session")
+                        return
+                    content_lengths = self.headers.get_all("Content-Length") or []
+                    if len(content_lengths) != 1 or self.headers.get("Transfer-Encoding"):
+                        self.send_error(400, "Invalid content length")
+                        return
+                    try:
+                        content_length = int(content_lengths[0])
+                    except ValueError:
+                        self.send_error(400, "Invalid content length")
+                        return
+                    if content_length <= 0 or content_length > _MAX_RUNTIME_REQUEST_BYTES:
+                        self.send_error(413, "Invalid result payload size")
+                        return
+                    try:
+                        raw = self.rfile.read(content_length)
+                        if len(raw) != content_length:
+                            raise ValueError
+
+                        def reject_json_constant(value: str) -> None:
+                            raise ValueError(value)
+
+                        data = json.loads(raw.decode("utf-8"), parse_constant=reject_json_constant)
+                        if not isinstance(data, dict):
+                            raise ValueError
+                    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError, TypeError, ValueError):
+                        self.send_error(400, "Invalid result payload")
+                        return
+                    body_token = data.get("token")
+                    if (
+                        not isinstance(body_token, str)
+                        or not self._session_is_valid(body_token)
+                        or not secrets.compare_digest(tokens[0], body_token)
+                    ):
+                        self.send_error(403, "Invalid runtime session")
+                        return
+
                     if "event" in data:
-                        event = data["event"]
-                        if not isinstance(event, str):
-                            raise TypeError
-                        self._viewer._handle_runtime_event(event, data.get("result"))
+                        if set(data) != {"token", "event", "result"} or data["event"] != "click":
+                            self.send_error(400, "Invalid runtime event")
+                            return
+                        result = data["result"]
+                        if result is not None and not isinstance(result, str):
+                            self.send_error(400, "Invalid runtime event")
+                            return
+                        self._viewer._handle_runtime_event("click", result)
                         self._send_json_success()
                         return
+
+                    if set(data) != {"token", "requestId", "result", "error"}:
+                        self.send_error(400, "Invalid result payload")
+                        return
                     request_id = data["requestId"]
-                    if not isinstance(request_id, str):
-                        raise TypeError
-                except (json.JSONDecodeError, KeyError, TypeError, ValueError):
-                    self.send_error(400, "Invalid result payload")
-                    return
+                    error = data["error"]
+                    if not self._is_runtime_request_id(request_id) or error is not None and not isinstance(error, str):
+                        self.send_error(400, "Invalid result payload")
+                        return
+                    with self._viewer._runtime_condition:
+                        if (
+                            request_id not in self._viewer._pending_runtime_ids
+                            or request_id in self._viewer._runtime_results
+                            or request_id in self._viewer._runtime_errors
+                        ):
+                            self.send_error(404, "Unknown runtime request")
+                            return
+                        if request_id in self._viewer._pending_screenshot_ids and error is None:
+                            self.send_error(400, "Screenshot results must use binary upload")
+                            return
+                        if error is not None:
+                            self._viewer._runtime_errors[request_id] = error
+                        else:
+                            self._viewer._runtime_results[request_id] = data["result"]
+                        self._viewer._runtime_condition.notify_all()
+                    self._send_json_success()
 
-                with self._viewer._runtime_condition:
-                    if data.get("error") is not None:
-                        self._viewer._runtime_errors[request_id] = str(data["error"])
-                    else:
-                        self._viewer._runtime_results[request_id] = data.get("result")
-                    self._viewer._runtime_condition.notify_all()
+                def _send_json_success(self) -> None:
+                    body = b'{"ok":true}'
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
 
-                self._send_json_success()
+                def log_message(self, format, *args):
+                    pass
 
-            def _send_json_success(self):
-                body = b'{"ok":true}'
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
+            Handler._viewer = self
+            server = BoundedThreadingHTTPServer(("127.0.0.1", port), Handler)
+            # Each accepted handler is synchronously drained by server_close().
+            # The per-connection timeout bounds close() even for a partial body.
+            server.daemon_threads = False
+            server.block_on_close = True
 
-            def log_message(self, format, *args):
-                pass  # Suppress request logs
+            actual_port = server.server_address[1]
+            url = f"http://127.0.0.1:{actual_port}/index.html"
 
-        Handler._viewer = self  # Attach viewer for command queue access
+            # Keep every action that can raise before the server is published.
+            # A browser may connect now; the listening socket is already bound
+            # and serve_forever() starts immediately after publication.
+            if open_browser:
+                webbrowser.open(url)
 
-        server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-        self._server = server
-        actual_port = server.server_address[1]
-        url = f"http://127.0.0.1:{actual_port}/index.html"
+            print(f"Serving at {url}")
+            print("Press Ctrl+C to stop the server.")
 
-        if open_browser:
-            webbrowser.open(url)
-
-        print(f"Serving at {url}")
-        print("Press Ctrl+C to stop the server.")
-        try:
+            with self._lifecycle_lock:
+                if self._closed:
+                    server.server_close()
+                    server = None
+                    raise RuntimeError("Viewer is closed")
+                if self._server is not None:
+                    server.server_close()
+                    server = None
+                    raise RuntimeError("Viewer is already being shown")
+                # Clear the event before exposing the server. A concurrent
+                # close() now waits for serve_forever() to observe shutdown,
+                # instead of closing the socket before that loop starts.
+                server._BaseServer__is_shut_down.clear()  # type: ignore[attr-defined]
+                self._server = server
+                self._server_tempdir = tempdir
+                self._session_token = session_token
+                server_published = True
             server.serve_forever()
         except KeyboardInterrupt:
             print("\nServer stopped.")
         finally:
-            server.server_close()
-            self._server = None
-            for raster in self._raster_sources.values():
-                if hasattr(raster, "close"):
-                    raster.close()
+            if server is not None and server_published:
+                self._finalize_runtime(server)
+            elif server is not None:
+                server.server_close()
+                tempdir.cleanup()
+            else:
+                tempdir.cleanup()
 
     def show_in_browser(self) -> None:
         """Alias for show(). Opens visualization via local HTTP server."""

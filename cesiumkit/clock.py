@@ -5,6 +5,9 @@ from __future__ import annotations
 import datetime as dt
 from typing import Any
 
+from pydantic import Field
+
+from cesiumkit._js_serializer import to_js_value
 from cesiumkit.base import CesiumBase
 from cesiumkit.enums import ClockRange, ClockStep
 
@@ -12,19 +15,17 @@ from cesiumkit.enums import ClockRange, ClockStep
 class JulianDate(CesiumBase):
     """Wrapper for Cesium.JulianDate."""
 
-    iso8601: str | None = None
+    iso8601: str = Field(min_length=1)
 
     def _js_class_name(self) -> str:
         return "Cesium.JulianDate"
 
     def to_js(self) -> str:
-        if self.iso8601:
-            return f'Cesium.JulianDate.fromIso8601("{self.iso8601}")'
-        raise ValueError("JulianDate requires iso8601 string")
+        return f"Cesium.JulianDate.fromIso8601({to_js_value(self.iso8601)})"
 
     def to_czml(self) -> str:
         """Serialize to the CZML ISO 8601 time string."""
-        return self.iso8601 or ""
+        return self.iso8601
 
     @classmethod
     def from_iso8601(cls, iso_string: str) -> JulianDate:
@@ -34,7 +35,10 @@ class JulianDate(CesiumBase):
     @classmethod
     def from_datetime(cls, datetime_obj: dt.datetime) -> JulianDate:
         """Create a JulianDate from a Python datetime."""
-        return cls(iso8601=datetime_obj.isoformat() + "Z")
+        if datetime_obj.tzinfo is None:
+            datetime_obj = datetime_obj.replace(tzinfo=dt.timezone.utc)
+        value = datetime_obj.astimezone(dt.timezone.utc).isoformat().replace("+00:00", "Z")
+        return cls(iso8601=value)
 
     @classmethod
     def now(cls) -> JulianDate:
@@ -50,7 +54,7 @@ class ClockConfig(CesiumBase):
     current_time: JulianDate | None = None
     clock_range: ClockRange | None = None
     clock_step: ClockStep | None = None
-    multiplier: float | None = None
+    multiplier: float | None = Field(default=None, allow_inf_nan=False)
     should_animate: bool | None = None
 
     def _js_class_name(self) -> str:

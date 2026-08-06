@@ -461,7 +461,8 @@ class TestRuntimeServerProtocol:
             address = viewer._server.server_address
             client = socket.create_connection(address, timeout=2)
             try:
-                client.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("hh", 1, 0))
+                linger_format = "hh" if os.name == "nt" else "ii"
+                client.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack(linger_format, 1, 0))
                 client.sendall(
                     (
                         f"GET /__cesiumkit_cmd?seq=0&token={token} HTTP/1.1\r\n"

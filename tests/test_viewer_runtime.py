@@ -8,6 +8,7 @@ import os
 import socket
 import socketserver
 import struct
+import tempfile
 import threading
 import time
 import urllib.error
@@ -657,6 +658,84 @@ class TestViewerLifecycle:
         assert raster.calls == 1
         viewer.close()
         assert raster.calls == 1
+
+    def test_concurrent_close_waits_for_resource_cleanup(self):
+        class BlockingRaster:
+            def __init__(self) -> None:
+                self.entered = threading.Event()
+                self.release = threading.Event()
+                self.close_calls = 0
+
+            def close(self) -> None:
+                self.close_calls += 1
+                self.entered.set()
+                if not self.release.wait(timeout=2):
+                    raise TimeoutError("test did not release raster cleanup")
+
+        viewer = cesiumkit.Viewer()
+        raster = BlockingRaster()
+        viewer._raster_sources["blocked"] = raster
+        errors: list[BaseException] = []
+
+        def request_close() -> None:
+            try:
+                viewer.close()
+            except BaseException as exc:  # pragma: no cover - asserted below
+                errors.append(exc)
+
+        first_close = threading.Thread(target=request_close)
+        second_close = threading.Thread(target=request_close)
+        first_close.start()
+        assert raster.entered.wait(timeout=2)
+        second_close.start()
+        try:
+            second_close.join(timeout=0.1)
+            assert second_close.is_alive()
+        finally:
+            raster.release.set()
+        first_close.join(timeout=2)
+        second_close.join(timeout=2)
+        assert not first_close.is_alive()
+        assert not second_close.is_alive()
+        assert errors == []
+        assert raster.close_calls == 1
+
+    def test_close_finishes_cleanup_when_a_raster_close_fails(self):
+        class FailingRaster:
+            def __init__(self) -> None:
+                self.close_calls = 0
+
+            def close(self) -> None:
+                self.close_calls += 1
+                raise RuntimeError("raster cleanup failed")
+
+        class ClosableRaster:
+            def __init__(self) -> None:
+                self.close_calls = 0
+
+            def close(self) -> None:
+                self.close_calls += 1
+
+        viewer = cesiumkit.Viewer()
+        failing_raster = FailingRaster()
+        closable_raster = ClosableRaster()
+        viewer._raster_sources["failing"] = failing_raster
+        viewer._raster_sources["closable"] = closable_raster
+        tempdir = tempfile.TemporaryDirectory()
+        tempdir_path = Path(tempdir.name)
+        viewer._server_tempdir = tempdir
+        viewer._pending_runtime_ids.add("pending")
+
+        with pytest.raises(RuntimeError, match="raster cleanup failed"):
+            viewer.close()
+
+        assert failing_raster.close_calls == 1
+        assert closable_raster.close_calls == 1
+        assert not tempdir_path.exists()
+        assert viewer._runtime_errors["pending"] == "Viewer closed"
+        viewer.close()
+        assert failing_raster.close_calls == 1
+        assert closable_raster.close_calls == 1
 
     def test_show_rejects_duplicate_server(self):
         with running_viewer(cesiumkit.Viewer()) as (viewer, _):

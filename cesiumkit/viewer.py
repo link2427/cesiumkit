@@ -229,6 +229,8 @@ class Viewer:
         self._server_tempdir: tempfile.TemporaryDirectory[str] | None = None
         self._session_token: str | None = None
         self._lifecycle_lock = threading.RLock()
+        self._runtime_finalization_done = threading.Event()
+        self._runtime_finalization_owner: int | None = None
         self._closed = False
         self._click_callbacks: list[Callable[[str | None], None]] = []
         self._click_events: queue.Queue[str | None] = queue.Queue(maxsize=_MAX_RUNTIME_EVENT_QUEUE)
@@ -1305,36 +1307,72 @@ class Viewer:
 
     def _finalize_runtime(self, expected_server: Any | None = None) -> None:
         """Release a stopped server, its temporary directory, and rasters."""
+        thread_id = threading.get_ident()
+        server: Any = None
+        tempdir: tempfile.TemporaryDirectory[str] | None = None
         with self._lifecycle_lock:
-            if expected_server is not None and self._server not in (expected_server, None):
+            if self._runtime_finalization_done.is_set():
                 return
-            if expected_server is not None and self._server is None and self._server_tempdir is None:
+            if self._runtime_finalization_owner is not None:
+                if self._runtime_finalization_owner == thread_id:
+                    return
+                wait_for_finalization = True
+            elif expected_server is not None and self._server is not expected_server:
                 return
-            server = self._server
-            tempdir = self._server_tempdir
-            self._server = None
-            self._server_tempdir = None
-            self._session_token = None
-            self._closed = True
+            else:
+                self._runtime_finalization_owner = thread_id
+                server = self._server
+                tempdir = self._server_tempdir
+                self._closed = True
+                wait_for_finalization = False
 
-        if server is not None:
+        if wait_for_finalization:
+            self._runtime_finalization_done.wait()
+            return
+
+        cleanup_error: BaseException | None = None
+        try:
+            if server is not None:
+                try:
+                    server.server_close()
+                except OSError:
+                    pass
+                except BaseException as exc:
+                    cleanup_error = exc
+            for raster in tuple(self._raster_sources.values()):
+                closer = getattr(raster, "close", None)
+                if callable(closer):
+                    try:
+                        closer()
+                    except BaseException as exc:
+                        if cleanup_error is None:
+                            cleanup_error = exc
+            if tempdir is not None:
+                try:
+                    tempdir.cleanup()
+                except BaseException as exc:
+                    if cleanup_error is None:
+                        cleanup_error = exc
             try:
-                server.server_close()
-            except OSError:
-                pass
-        if tempdir is not None:
-            tempdir.cleanup()
-        for raster in tuple(self._raster_sources.values()):
-            closer = getattr(raster, "close", None)
-            if callable(closer):
-                closer()
-        with self._runtime_condition:
-            self._command_queue.clear()
-            self._command_sizes.clear()
-            self._command_log_bytes = 0
-            for request_id in self._pending_runtime_ids:
-                self._runtime_errors.setdefault(request_id, "Viewer closed")
-            self._runtime_condition.notify_all()
+                with self._runtime_condition:
+                    self._command_queue.clear()
+                    self._command_sizes.clear()
+                    self._command_log_bytes = 0
+                    for request_id in self._pending_runtime_ids:
+                        self._runtime_errors.setdefault(request_id, "Viewer closed")
+                    self._runtime_condition.notify_all()
+            except BaseException as exc:
+                if cleanup_error is None:
+                    cleanup_error = exc
+        finally:
+            with self._lifecycle_lock:
+                self._server = None
+                self._server_tempdir = None
+                self._session_token = None
+                self._runtime_finalization_owner = None
+                self._runtime_finalization_done.set()
+        if cleanup_error is not None:
+            raise cleanup_error
 
     def close(self) -> None:
         """Stop the local server and release all viewer-owned resources.
@@ -1343,7 +1381,7 @@ class Viewer:
         viewer to start another local runtime after resources have been freed.
         """
         with self._lifecycle_lock:
-            if self._closed and self._server is None and self._server_tempdir is None:
+            if self._closed and self._runtime_finalization_done.is_set():
                 return
             self._closed = True
             server = self._server

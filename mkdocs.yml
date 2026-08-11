@@ -110,6 +110,7 @@ nav:
       - examples/09_camera_controls.md
       - examples/10_event_handlers.md
       - examples/11_runtime_control.md
+      - examples/12_rocket_stage_separation.md
   - Gallery: gallery.md
   - Reference:
       - reference/index.md

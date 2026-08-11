@@ -2,7 +2,7 @@
 
 _Reference. One page per runnable script in
 [`examples/`](https://github.com/link2427/cesiumkit/tree/main/examples).
-Every page contains the complete script — copy it, run it, change it._
+Every page documents a complete script you can run and change._
 
 For rendered screenshots of a curated subset, see the [Gallery](../gallery.md).
 
@@ -46,5 +46,14 @@ For rendered screenshots of a curated subset, see the [Gallery](../gallery.md).
     receive click callbacks.
 
     [:octicons-arrow-right-24: Runtime control example](11_runtime_control.md)
+
+-   :material-rocket-launch:{ .lg .middle } **12 · Rocket stage separation**
+
+    ---
+
+    Hand position and velocity from a booster to its second stage, then
+    propagate both stages independently.
+
+    [:octicons-arrow-right-24: Rocket staging example](12_rocket_stage_separation.md)
 
 </div>

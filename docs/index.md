@@ -80,5 +80,5 @@ The same globe, two ways:
 
 - [Getting Started](getting-started.md): install and first visualization
 - [Tutorial](tutorial.md): build a flight tracker step by step
-- [Examples](examples/index.md): 11 runnable example scripts
+- [Examples](examples/index.md): 12 runnable example scripts
 - [API Reference](api/index.md): full auto-generated docs
